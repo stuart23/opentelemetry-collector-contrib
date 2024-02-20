@@ -9,7 +9,7 @@ require (
 	github.com/grafana/loki/pkg/push v0.0.0-20231127162423-bd505f8e2d37
 	github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal v0.94.0
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/translator/loki v0.94.0
-	github.com/prometheus/common v0.46.0
+	github.com/prometheus/common v0.47.0
 	github.com/stretchr/testify v1.8.4
 	go.opentelemetry.io/collector v0.94.1
 	go.opentelemetry.io/collector/component v0.94.1
