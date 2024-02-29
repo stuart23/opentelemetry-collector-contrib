@@ -66,3 +66,4 @@ In addition, it also supports an enum for metrics data type, with the numeric va
 | METRIC_DATA_TYPE_HISTOGRAM             | 3     |
 | METRIC_DATA_TYPE_EXPONENTIAL_HISTOGRAM | 4     |
 | METRIC_DATA_TYPE_SUMMARY               | 5     |
+
