@@ -1,0 +1,19 @@
+kubectl config use-context kind-kind
+
+kind create cluster
+
+make kind-build
+
+
+## Install Kube State Metrics
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm install ksm prometheus-community/kube-state-metrics
+
+## Install Otel Collector to look for metrics mock
+helm install otel-dev open-telemetry/opentelemetry-collector --values ./examples/kubernetes/metrics-mock.yaml
+
+## Create a fake pod for k8sattributes to match against
+kubectl create namespace my-namespace
+kubectl run my-server -n my-namespace --image nginx

@@ -1,0 +1,3 @@
+docker build -t metrics-mock .
+kind load docker-image metrics-mock
+kubectl apply -f metrics-mock.yaml
