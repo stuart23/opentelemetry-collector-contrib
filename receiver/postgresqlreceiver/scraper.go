@@ -125,21 +125,33 @@ func (p *postgreSQLScraper) scrape(ctx context.Context) (pmetric.Metrics, error)
 	}
 	defer listClient.Close()
 
-	if len(databases) == 0 {
-		dbList, dbErr := listClient.listDatabases(ctx)
-		if dbErr != nil {
-			p.logger.Error("Failed to request list of databases from postgres", zap.Error(dbErr))
-			return pmetric.NewMetrics(), dbErr
-		}
-		databases = dbList
+	dbMap, dbErr := listClient.getDatabaseIds(ctx)
+	if dbErr != nil {
+		p.logger.Error("Failed to request list of databases from postgres", zap.Error(dbErr))
+		return pmetric.NewMetrics(), dbErr
 	}
-	var filteredDatabases []string
-	for _, db := range databases {
-		if _, ok := p.excludes[db]; !ok {
-			filteredDatabases = append(filteredDatabases, db)
+
+	// If databases are explicitly provided, keep only those in dbMap and remove any excluded names
+	if len(databases) > 0 {
+		allowed := make(map[string]struct{}, len(databases))
+		for _, db := range databases {
+			allowed[db] = struct{}{}
+		}
+		for name := range dbMap {
+			if _, ok := allowed[string(name)]; !ok {
+				delete(dbMap, name)
+				continue
+			}
+			if _, excluded := p.excludes[string(name)]; excluded {
+				delete(dbMap, name)
+			}
 		}
 	}
-	databases = filteredDatabases
+
+	dbNames := make([]string, 0, len(dbMap))
+	for name := range dbMap {
+		dbNames = append(dbNames, string(name))
+	}
 
 	now := pcommon.NewTimestampFromTime(time.Now())
 
@@ -149,9 +161,9 @@ func (p *postgreSQLScraper) scrape(ctx context.Context) (pmetric.Metrics, error)
 		dbSizeMap:   make(map[databaseName]int64),
 		dbStats:     make(map[databaseName]databaseStats),
 	}
-	p.retrieveDBMetrics(ctx, listClient, databases, r, &errs)
+	p.retrieveDBMetrics(ctx, listClient, dbNames, r, &errs)
 
-	for _, database := range databases {
+	for _, database := range dbNames {
 		dbClient, dbErr := p.clientFactory.getClient(database)
 		if dbErr != nil {
 			errs.add(dbErr)
@@ -166,7 +178,7 @@ func (p *postgreSQLScraper) scrape(ctx context.Context) (pmetric.Metrics, error)
 		p.collectFunctions(ctx, now, dbClient, database, &errs)
 	}
 
-	p.mb.RecordPostgresqlDatabaseCountDataPoint(now, int64(len(databases)))
+	p.mb.RecordPostgresqlDatabaseCountDataPoint(now, int64(len(dbNames)))
 	p.collectBGWriterStats(ctx, now, listClient, &errs)
 	p.collectWalAge(ctx, now, listClient, &errs)
 	p.collectReplicationStats(ctx, now, listClient, &errs)

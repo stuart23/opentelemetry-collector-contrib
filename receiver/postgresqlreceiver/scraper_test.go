@@ -531,6 +531,11 @@ func (*mockClient) getTopQuery(context.Context, int64, *zap.Logger) ([]map[strin
 	panic("unimplemented")
 }
 
+// getDatabaseQueryStats implements client.
+func (*mockClient) getDatabaseQueryStats(context.Context, []int64, []int64) ([]databaseTransactionStats, error) {
+	return []databaseTransactionStats{}, nil
+}
+
 // close implements postgreSQLClientFactory.
 func (mockSimpleClientFactory) close() error {
 	return nil
@@ -626,6 +631,11 @@ func (m *mockClient) getVersion(_ context.Context) (string, error) {
 	return args.String(0), args.Error(1)
 }
 
+func (m *mockClient) getDatabaseIds(ctx context.Context) (map[databaseName]int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(map[databaseName]int64), args.Error(1)
+}
+
 func (m *mockClientFactory) getClient(database string) (client, error) {
 	args := m.Called(database)
 	return args.Get(0).(client), args.Error(1)
@@ -653,6 +663,13 @@ func (m *mockClient) initMocks(database, schema string, databases []string, inde
 
 	if database == defaultPostgreSQLDatabase {
 		m.On("listDatabases").Return(databases, nil)
+
+		// Provide database IDs mapping for getDatabaseIds
+		dbIds := map[databaseName]int64{}
+		for idx, db := range databases {
+			dbIds[databaseName(db)] = int64(idx + 1)
+		}
+		m.On("getDatabaseIds", mock.Anything).Return(dbIds, nil)
 
 		dbStats := map[databaseName]databaseStats{}
 		dbSize := map[databaseName]int64{}

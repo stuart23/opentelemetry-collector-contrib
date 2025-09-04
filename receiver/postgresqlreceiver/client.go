@@ -39,6 +39,10 @@ var preciseLagMetricsFg = featuregate.GlobalRegistry().MustRegister(
 // i.e. database1
 type databaseName string
 
+// userName is a name that refers to a user so that it can be uniquely referred to later
+// i.e. user1
+type userName string
+
 // tableIdentifier is an identifier that contains both the database and table separated by a "|"
 // i.e. database1|table2
 type tableIdentifier string
@@ -56,6 +60,7 @@ var errNoLastArchive = errors.New("no last archive found, not able to calculate 
 type client interface {
 	Close() error
 	getDatabaseStats(ctx context.Context, databases []string) (map[databaseName]databaseStats, error)
+	getDatabaseQueryStats(ctx context.Context, userIds []int64, databaseIds []int64) ([]databaseTransactionStats, error)
 	getDatabaseLocks(ctx context.Context) ([]databaseLocks, error)
 	getBGWriterStats(ctx context.Context) (*bgStat, error)
 	getBackends(ctx context.Context, databases []string) (map[databaseName]int64, error)
@@ -67,7 +72,7 @@ type client interface {
 	getMaxConnections(ctx context.Context) (int64, error)
 	getIndexStats(ctx context.Context, database string) (map[indexIdentifer]indexStat, error)
 	getFunctionStats(ctx context.Context, database string) (map[functionIdentifer]functionStat, error)
-	listDatabases(ctx context.Context) ([]string, error)
+	getDatabaseIds(ctx context.Context) (map[databaseName]int64, error)
 	getVersion(ctx context.Context) (string, error)
 	getQuerySamples(ctx context.Context, limit int64, newestQueryTimestamp float64, logger *zap.Logger) ([]map[string]any, float64, error)
 	getTopQuery(ctx context.Context, limit int64, logger *zap.Logger) ([]map[string]any, error)
@@ -201,6 +206,23 @@ type databaseStats struct {
 	blksRead             int64
 }
 
+type databaseTransactionStats struct {
+	userid           int64
+	dbid             int64
+	plans            int64
+	total_plan_time  int64
+	min_plan_time    int64
+	max_plan_time    int64
+	mean_plan_time   int64
+	stddev_plan_time int64
+	calls            int64
+	total_exec_time  int64
+	min_exec_time    int64
+	max_exec_time    int64
+	mean_exec_time   int64
+	stddev_exec_time int64
+}
+
 func (c *postgreSQLClient) getDatabaseStats(ctx context.Context, databases []string) (map[databaseName]databaseStats, error) {
 	query := filterQueryByDatabases(
 		"SELECT datname, xact_commit, xact_rollback, deadlocks, temp_files, temp_bytes, tup_updated, tup_returned, tup_fetched, tup_inserted, tup_deleted, blks_hit, blks_read FROM pg_stat_database",
@@ -242,6 +264,50 @@ func (c *postgreSQLClient) getDatabaseStats(ctx context.Context, databases []str
 		}
 	}
 	return dbStats, errs
+}
+
+func (c *postgreSQLClient) getDatabaseQueryStats(ctx context.Context, userIds []int64, databaseIds []int64) ([]databaseTransactionStats, error) {
+	query := filterQueryByUsersAndDatabases(
+		"SELECT userid, dbid, plans, total_plan_time, min_plan_time, max_plan_time, mean_plan_time, stddev_plan_time, calls, total_exec_time, min_exec_time, max_exec_time, mean_exec_time, stddev_exec_time FROM pg_stat_statements",
+		userIds,
+		databaseIds,
+		false,
+		false,
+	)
+
+	rows, err := c.client.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	var errs error
+	transactionStats := []databaseTransactionStats{}
+
+	for rows.Next() {
+		var userid, dbid, plans, total_plan_time, min_plan_time, max_plan_time, mean_plan_time, stddev_plan_time, calls, total_exec_time, min_exec_time, max_exec_time, mean_exec_time, stddev_exec_time int64
+		err = rows.Scan(&userid, &dbid, &plans, &total_plan_time, &min_plan_time, &max_plan_time, &mean_plan_time, &stddev_plan_time, &calls, &total_exec_time, &min_exec_time, &max_exec_time, &mean_exec_time, &stddev_exec_time)
+		if err != nil {
+			errs = multierr.Append(errs, err)
+			continue
+		}
+		transactionStats = append(transactionStats, databaseTransactionStats{
+			userid:           userid,
+			dbid:             dbid,
+			plans:            plans,
+			total_plan_time:  total_plan_time,
+			min_plan_time:    min_plan_time,
+			max_plan_time:    max_plan_time,
+			mean_plan_time:   mean_plan_time,
+			stddev_plan_time: stddev_plan_time,
+			calls:            calls,
+			total_exec_time:  total_exec_time,
+			min_exec_time:    min_exec_time,
+			max_exec_time:    max_exec_time,
+			mean_exec_time:   mean_exec_time,
+			stddev_exec_time: stddev_exec_time,
+		})
+	}
+	return transactionStats, errs
 }
 
 type databaseLocks struct {
@@ -305,6 +371,30 @@ func (c *postgreSQLClient) getBackends(ctx context.Context, databases []string) 
 		}
 	}
 	return ars, errors
+}
+
+// getUsers returns a map of user names to their unique identifiers
+func (c *postgreSQLClient) getUsers(ctx context.Context) (map[userName]int64, error) {
+	query := "SELECT usename, usesysid FROM pg_user"
+	rows, err := c.client.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	users := map[userName]int64{}
+	var errors error
+	for rows.Next() {
+		var usename string
+		var usesysid int64
+
+		err := rows.Scan(&usename, &usesysid)
+		if err != nil {
+			errors = multierr.Append(errors, err)
+			continue
+		}
+		users[userName(usename)] = usesysid
+	}
+	return users, errors
 }
 
 func (c *postgreSQLClient) getDatabaseSize(ctx context.Context, databases []string) (map[databaseName]int64, error) {
@@ -782,6 +872,29 @@ func (c *postgreSQLClient) getLatestWalAgeSeconds(ctx context.Context) (int64, e
 	return age, nil
 }
 
+// getDBIds returns a map of database names to their unique identifiers
+func (c *postgreSQLClient) getDatabaseIds(ctx context.Context) (map[databaseName]int64, error) {
+	query := "SELECT oid AS database_id, datname AS database_name FROM pg_database"
+	rows, err := c.client.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	databases := map[databaseName]int64{}
+	var errors error
+	for rows.Next() {
+		var dbname string
+		var dbsysid int64
+
+		err := rows.Scan(&dbname, &dbsysid)
+		if err != nil {
+			errors = multierr.Append(errors, err)
+			continue
+		}
+		databases[databaseName(dbname)] = dbsysid
+	}
+	return databases, errors
+}
 func (c *postgreSQLClient) listDatabases(ctx context.Context) ([]string, error) {
 	query := `SELECT datname FROM pg_database
 	WHERE datistemplate = false;`
@@ -818,6 +931,39 @@ func parseMajorVersion(ver string) (int, error) {
 	}
 
 	return strconv.Atoi(parts[0])
+}
+
+func filterQueryByUsersAndDatabases(baseQuery string, userIds []int64, databaseIds []int64, groupByUsers bool, groupByDatabases bool) string {
+	if len(userIds) > 0 {
+		var queryUsers []string
+		for _, userId := range userIds {
+			queryUsers = append(queryUsers, fmt.Sprintf("%d", userId))
+		}
+		if strings.Contains(baseQuery, "WHERE") {
+			baseQuery += fmt.Sprintf(" AND userid IN (%s)", strings.Join(queryUsers, ","))
+		} else {
+			baseQuery += fmt.Sprintf(" WHERE userid IN (%s)", strings.Join(queryUsers, ","))
+		}
+	}
+	if len(databaseIds) > 0 {
+		var queryDatabases []string
+		for _, databaseId := range databaseIds {
+			queryDatabases = append(queryDatabases, fmt.Sprintf("%d", databaseId))
+		}
+		if strings.Contains(baseQuery, "WHERE") {
+			baseQuery += fmt.Sprintf(" AND database_id IN (%s)", strings.Join(queryDatabases, ","))
+		} else {
+			baseQuery += fmt.Sprintf(" WHERE database_id IN (%s)", strings.Join(queryDatabases, ","))
+		}
+	}
+	if groupByUsers && groupByDatabases {
+		baseQuery += " GROUP BY userid, database_id"
+	} else if groupByUsers && !groupByDatabases {
+		baseQuery += " GROUP BY userid"
+	} else if !groupByUsers && groupByDatabases {
+		baseQuery += " GROUP BY database_id"
+	}
+	return baseQuery + ";"
 }
 
 func filterQueryByDatabases(baseQuery string, databases []string, groupBy bool) string {
