@@ -285,6 +285,7 @@ receiver/oracledbreceiver
 receiver/osqueryreceiver
 receiver/otlpjsonfilereceiver
 receiver/podmanreceiver
+receiver/playwrightreceiver
 receiver/postgresqlreceiver
 receiver/pprofreceiver
 receiver/prometheusremotewritereceiver

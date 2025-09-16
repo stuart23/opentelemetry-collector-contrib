@@ -1,0 +1,34 @@
+type: playwright
+
+status:
+  class: receiver
+  stability:
+    alpha: [ metrics ]
+  distributions: [ contrib ]
+  warnings: []
+  codeowners:
+    active: []
+
+resource_attributes:
+
+attributes:
+  playwright.endpoint:
+    description: Playwright WebSocket endpoint URL.
+    type: string
+  target.type:
+    description: The type of the target (page, background_page, service_worker, browser, etc).
+    type: string
+
+metrics:
+  playwright.targets.count:
+    description: Number of active targets reported by Playwright.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: "{target}"
+    attributes: [ playwright.endpoint, target.type ]
+
+tests:
+  skip_lifecycle: true
+  config:
+    endpoint: ws://localhost:9222

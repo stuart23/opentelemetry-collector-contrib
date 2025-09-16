@@ -1,0 +1,10 @@
+playwright:
+  endpoint: ws://localhost:9222
+  collection_interval: 30s
+
+playwright/customname:
+  endpoint: ws://localhost:9223
+  collection_interval: 60s
+  metrics:
+    playwright.targets.count:
+      enabled: true

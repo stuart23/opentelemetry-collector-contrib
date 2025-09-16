@@ -1,0 +1,9 @@
+default:
+all_set:
+  metrics:
+    playwright.targets.count:
+      enabled: true
+none_set:
+  metrics:
+    playwright.targets.count:
+      enabled: false
