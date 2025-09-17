@@ -438,3 +438,197 @@ func TestPlaywrightClientGetTargetsViaCDP(t *testing.T) {
 	t.Logf("Response received: %+v", resp)
 	t.Logf("Response result: %s", string(resp.Result))
 }
+
+func TestPlaywrightClientAttachToTarget(t *testing.T) {
+	var receivedMessage PlaywrightMessage
+
+	server := mockPlaywrightServer(t, func(conn *websocket.Conn) {
+		for {
+			var msg PlaywrightMessage
+			err := conn.ReadJSON(&msg)
+			if err != nil {
+				return
+			}
+
+			receivedMessage = msg
+
+			// Send back a response for AttachToTarget
+			if msg.Method == "send" {
+				if params, ok := msg.Params["method"].(string); ok && params == "Target.attachToTarget" {
+					response := PlaywrightResponse{
+						ID:     msg.ID,
+						Result: []byte(`{"result":{"sessionId":"attached-session-123"}}`),
+					}
+					conn.WriteJSON(response)
+				}
+			}
+		}
+	})
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	client := NewPlaywrightClient(wsURL, zaptest.NewLogger(t))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := client.Connect(ctx)
+	require.NoError(t, err)
+	defer client.Disconnect()
+
+	// Test the AttachToTarget method
+	sessionGUID := "session@test-cdp-session-789"
+	targetID := "target-123"
+
+	result, err := client.AttachToTarget(ctx, sessionGUID, targetID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Give a moment for the message to be processed
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify the message was sent correctly
+	assert.Equal(t, "send", receivedMessage.Method, "Method should be 'send'")
+	assert.Equal(t, sessionGUID, receivedMessage.GUID, "GUID should match session GUID")
+
+	// Verify params structure
+	assert.Contains(t, receivedMessage.Params, "method", "Params should contain 'method'")
+	assert.Equal(t, "Target.attachToTarget", receivedMessage.Params["method"], "CDP method should be Target.attachToTarget")
+
+	assert.Contains(t, receivedMessage.Params, "params", "Params should contain 'params'")
+	cdpParams, ok := receivedMessage.Params["params"].(map[string]interface{})
+	require.True(t, ok, "CDP params should be a map")
+
+	assert.Equal(t, targetID, cdpParams["targetId"], "targetId parameter should match")
+	assert.Equal(t, true, cdpParams["flatten"], "flatten parameter should be true")
+
+	// Verify metadata
+	if receivedMessage.Metadata != nil {
+		metadata := receivedMessage.Metadata
+		assert.Contains(t, metadata, "wallTime", "Metadata should contain wallTime")
+		assert.Contains(t, metadata, "apiName", "Metadata should contain apiName")
+		assert.Equal(t, "CDPSession.send", metadata["apiName"], "apiName should be CDPSession.send")
+		assert.Equal(t, false, metadata["internal"], "internal should be false")
+
+		// Verify wallTime is recent
+		wallTime, ok := metadata["wallTime"].(float64)
+		require.True(t, ok, "wallTime should be a number")
+		now := time.Now().UnixMilli()
+		assert.InDelta(t, float64(now), wallTime, 10000, "wallTime should be recent")
+	}
+
+	// Verify the result
+	assert.Equal(t, "attached-session-123", result.SessionID, "SessionID should match response")
+
+	t.Logf("AttachToTarget method test successful!")
+	t.Logf("Session GUID: %s", sessionGUID)
+	t.Logf("Target ID: %s", targetID)
+	t.Logf("CDP Method: Target.attachToTarget")
+	t.Logf("Direct params: %+v", receivedMessage.Params)
+	t.Logf("Result: %+v", result)
+	t.Logf("Attached session ID: %s", result.SessionID)
+}
+
+func TestPlaywrightClientGetPerformanceMetrics(t *testing.T) {
+	var receivedMessage PlaywrightMessage
+
+	server := mockPlaywrightServer(t, func(conn *websocket.Conn) {
+		for {
+			var msg PlaywrightMessage
+			err := conn.ReadJSON(&msg)
+			if err != nil {
+				return
+			}
+
+			receivedMessage = msg
+
+			// Send back a response for GetPerformanceMetrics
+			if msg.Method == "send" {
+				if params, ok := msg.Params["method"].(string); ok && params == "Performance.getMetrics" {
+					response := PlaywrightResponse{
+						ID:     msg.ID,
+						Result: []byte(`{"result":{"metrics":[{"name":"Timestamp","value":1234567.89},{"name":"Documents","value":3},{"name":"Frames","value":2},{"name":"JSEventListeners","value":15}]}}`),
+					}
+					conn.WriteJSON(response)
+				}
+			}
+		}
+	})
+	defer server.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
+	client := NewPlaywrightClient(wsURL, zaptest.NewLogger(t))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	err := client.Connect(ctx)
+	require.NoError(t, err)
+	defer client.Disconnect()
+
+	// Test the GetPerformanceMetrics method
+	targetSessionID := "attached-session-123"
+
+	result, err := client.GetPerformanceMetrics(ctx, targetSessionID)
+	require.NoError(t, err)
+	require.NotNil(t, result)
+
+	// Give a moment for the message to be processed
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify the message was sent correctly
+	assert.Equal(t, "send", receivedMessage.Method, "Method should be 'send'")
+	assert.Equal(t, targetSessionID, receivedMessage.GUID, "GUID should match target session ID")
+
+	// Verify params structure
+	assert.Contains(t, receivedMessage.Params, "method", "Params should contain 'method'")
+	assert.Equal(t, "Performance.getMetrics", receivedMessage.Params["method"], "CDP method should be Performance.getMetrics")
+
+	assert.Contains(t, receivedMessage.Params, "params", "Params should contain 'params'")
+	cdpParams, ok := receivedMessage.Params["params"].(map[string]interface{})
+	require.True(t, ok, "CDP params should be a map")
+
+	// Performance.getMetrics should have empty params
+	assert.Empty(t, cdpParams, "Performance.getMetrics should have empty params")
+
+	// Verify metadata
+	if receivedMessage.Metadata != nil {
+		metadata := receivedMessage.Metadata
+		assert.Contains(t, metadata, "wallTime", "Metadata should contain wallTime")
+		assert.Contains(t, metadata, "apiName", "Metadata should contain apiName")
+		assert.Equal(t, "CDPSession.send", metadata["apiName"], "apiName should be CDPSession.send")
+		assert.Equal(t, false, metadata["internal"], "internal should be false")
+
+		// Verify wallTime is recent
+		wallTime, ok := metadata["wallTime"].(float64)
+		require.True(t, ok, "wallTime should be a number")
+		now := time.Now().UnixMilli()
+		assert.InDelta(t, float64(now), wallTime, 10000, "wallTime should be recent")
+	}
+
+	// Verify the result contains expected performance metrics
+	assert.Len(t, result.Metrics, 4, "Should have 4 performance metrics")
+
+	expectedMetrics := map[string]float64{
+		"Timestamp":        1234567.89,
+		"Documents":        3,
+		"Frames":           2,
+		"JSEventListeners": 15,
+	}
+
+	for _, metric := range result.Metrics {
+		expectedValue, exists := expectedMetrics[metric.Name]
+		assert.True(t, exists, "Metric %s should be expected", metric.Name)
+		assert.Equal(t, expectedValue, metric.Value, "Metric %s should have correct value", metric.Name)
+	}
+
+	t.Logf("GetPerformanceMetrics method test successful!")
+	t.Logf("Target Session ID: %s", targetSessionID)
+	t.Logf("CDP Method: Performance.getMetrics")
+	t.Logf("Direct params: %+v", receivedMessage.Params)
+	t.Logf("Result: %+v", result)
+	t.Logf("Performance metrics count: %d", len(result.Metrics))
+	for _, metric := range result.Metrics {
+		t.Logf("  %s: %f", metric.Name, metric.Value)
+	}
+}

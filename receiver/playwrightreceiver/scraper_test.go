@@ -6,6 +6,7 @@ package playwrightreceiver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -148,18 +149,51 @@ func TestScraperScrape(t *testing.T) {
 
 			// Handle CDP messages sent via "send" method
 			if msg.Method == "send" {
-				// Check if this is a Target.getTargets CDP command
-				if params, ok := msg.Params["method"].(string); ok && params == "Target.getTargets" {
-					// Wrap the mock targets in the CDP response format
-					cdpResult := map[string]interface{}{
-						"result": mockTargets,
+				if params, ok := msg.Params["method"].(string); ok {
+					switch params {
+					case "Target.getTargets":
+						// Wrap the mock targets in the CDP response format
+						cdpResult := map[string]interface{}{
+							"result": mockTargets,
+						}
+						result, _ := json.Marshal(cdpResult)
+						response := PlaywrightResponse{
+							ID:     msg.ID,
+							Result: result,
+						}
+						conn.WriteJSON(response)
+					case "Target.attachToTarget":
+						// Mock response for Target.attachToTarget
+						cdpResult := map[string]interface{}{
+							"result": map[string]interface{}{
+								"sessionId": "mock-attached-session-" + fmt.Sprintf("%d", msg.ID),
+							},
+						}
+						result, _ := json.Marshal(cdpResult)
+						response := PlaywrightResponse{
+							ID:     msg.ID,
+							Result: result,
+						}
+						conn.WriteJSON(response)
+					case "Performance.getMetrics":
+						// Mock response for Performance.getMetrics
+						cdpResult := map[string]interface{}{
+							"result": map[string]interface{}{
+								"metrics": []map[string]interface{}{
+									{"name": "Timestamp", "value": 1234567.89},
+									{"name": "Documents", "value": 3.0},
+									{"name": "Frames", "value": 2.0},
+									{"name": "JSEventListeners", "value": 15.0},
+								},
+							},
+						}
+						result, _ := json.Marshal(cdpResult)
+						response := PlaywrightResponse{
+							ID:     msg.ID,
+							Result: result,
+						}
+						conn.WriteJSON(response)
 					}
-					result, _ := json.Marshal(cdpResult)
-					response := PlaywrightResponse{
-						ID:     msg.ID,
-						Result: result,
-					}
-					conn.WriteJSON(response)
 				}
 			}
 		}
@@ -263,16 +297,38 @@ func TestScraperScrapeTargetsError(t *testing.T) {
 
 			// Handle CDP messages sent via "send" method
 			if msg.Method == "send" {
-				// Check if this is a Target.getTargets CDP command
-				if params, ok := msg.Params["method"].(string); ok && params == "Target.getTargets" {
-					response := PlaywrightResponse{
-						ID: msg.ID,
-						Error: &PlaywrightError{
-							Code:    -1,
-							Message: "Mock Playwright error",
-						},
+				if params, ok := msg.Params["method"].(string); ok {
+					switch params {
+					case "Target.getTargets":
+						response := PlaywrightResponse{
+							ID: msg.ID,
+							Error: &PlaywrightError{
+								Code:    -1,
+								Message: "Mock Playwright error",
+							},
+						}
+						conn.WriteJSON(response)
+					case "Target.attachToTarget":
+						// Also return error for attachToTarget in error test
+						response := PlaywrightResponse{
+							ID: msg.ID,
+							Error: &PlaywrightError{
+								Code:    -1,
+								Message: "Mock Target.attachToTarget error",
+							},
+						}
+						conn.WriteJSON(response)
+					case "Performance.getMetrics":
+						// Also return error for Performance.getMetrics in error test
+						response := PlaywrightResponse{
+							ID: msg.ID,
+							Error: &PlaywrightError{
+								Code:    -1,
+								Message: "Mock Performance.getMetrics error",
+							},
+						}
+						conn.WriteJSON(response)
 					}
-					conn.WriteJSON(response)
 				}
 			}
 		}

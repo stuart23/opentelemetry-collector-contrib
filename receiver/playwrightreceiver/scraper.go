@@ -163,10 +163,65 @@ func (p *playwrightScraper) parseTargetsAndRecordMetrics(responseData []byte) er
 		return err
 	}
 
-	// Count targets by type
+	// Count targets by type and attach to each target
 	targetCounts := make(map[string]int64)
+	attachedSessions := make([]string, 0, len(targetsResp.Result.TargetInfos))
+
 	for _, target := range targetsResp.Result.TargetInfos {
 		targetCounts[target.Type]++
+
+		// Attach to each target using AttachToTarget
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		attachResult, err := p.client.AttachToTarget(ctx, p.sessionGUID, target.TargetID)
+		cancel()
+
+		if err != nil {
+			p.settings.Logger.Warn("Failed to attach to target",
+				zap.String("targetId", target.TargetID),
+				zap.String("targetType", target.Type),
+				zap.String("sessionGUID", p.sessionGUID),
+				zap.Error(err))
+		} else {
+			attachedSessions = append(attachedSessions, attachResult.SessionID)
+			p.settings.Logger.Debug("Successfully attached to target",
+				zap.String("targetId", target.TargetID),
+				zap.String("targetType", target.Type),
+				zap.String("targetTitle", target.Title),
+				zap.String("targetUrl", target.URL),
+				zap.String("sessionId", attachResult.SessionID),
+				zap.String("sessionGUID", p.sessionGUID))
+
+			// Get performance metrics for the attached target session
+			perfCtx, perfCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			perfMetrics, perfErr := p.client.GetPerformanceMetrics(perfCtx, attachResult.SessionID)
+			perfCancel()
+
+			if perfErr != nil {
+				p.settings.Logger.Warn("Failed to get performance metrics from target session",
+					zap.String("targetId", target.TargetID),
+					zap.String("targetType", target.Type),
+					zap.String("sessionId", attachResult.SessionID),
+					zap.Error(perfErr))
+			} else {
+				p.settings.Logger.Info("Successfully retrieved performance metrics from target",
+					zap.String("targetId", target.TargetID),
+					zap.String("targetType", target.Type),
+					zap.String("targetTitle", target.Title),
+					zap.String("targetUrl", target.URL),
+					zap.String("sessionId", attachResult.SessionID),
+					zap.Int("metricsCount", len(perfMetrics.Metrics)))
+
+				// Log individual performance metrics
+				for _, metric := range perfMetrics.Metrics {
+					p.settings.Logger.Debug("Performance metric",
+						zap.String("targetId", target.TargetID),
+						zap.String("targetType", target.Type),
+						zap.String("sessionId", attachResult.SessionID),
+						zap.String("metricName", metric.Name),
+						zap.Float64("metricValue", metric.Value))
+				}
+			}
+		}
 	}
 
 	// Record metrics for each target type
@@ -179,10 +234,12 @@ func (p *playwrightScraper) parseTargetsAndRecordMetrics(responseData []byte) er
 			zap.String("endpoint", p.cfg.Endpoint))
 	}
 
-	p.settings.Logger.Info("Successfully recorded target metrics",
+	p.settings.Logger.Info("Successfully recorded target metrics and attached to targets",
 		zap.Int("total_targets", len(targetsResp.Result.TargetInfos)),
 		zap.Int("unique_types", len(targetCounts)),
-		zap.Any("counts_by_type", targetCounts))
+		zap.Int("attached_sessions", len(attachedSessions)),
+		zap.Any("counts_by_type", targetCounts),
+		zap.Strings("attached_session_ids", attachedSessions))
 
 	return nil
 }
