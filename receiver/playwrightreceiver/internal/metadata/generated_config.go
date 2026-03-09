@@ -27,11 +27,59 @@ func (ms *MetricConfig) Unmarshal(parser *confmap.Conf) error {
 
 // MetricsConfig provides config for playwright metrics.
 type MetricsConfig struct {
-	PlaywrightTargetsCount MetricConfig `mapstructure:"playwright.targets.count"`
+	PlaywrightPageDocumentCount        MetricConfig `mapstructure:"playwright.page.document.count"`
+	PlaywrightPageDomNodeCount         MetricConfig `mapstructure:"playwright.page.dom_node.count"`
+	PlaywrightPageFrameCount           MetricConfig `mapstructure:"playwright.page.frame.count"`
+	PlaywrightPageJsEventListenerCount MetricConfig `mapstructure:"playwright.page.js_event_listener.count"`
+	PlaywrightPageJsHeapTotalSize      MetricConfig `mapstructure:"playwright.page.js_heap.total_size"`
+	PlaywrightPageJsHeapUsedSize       MetricConfig `mapstructure:"playwright.page.js_heap.used_size"`
+	PlaywrightPageLayoutCount          MetricConfig `mapstructure:"playwright.page.layout.count"`
+	PlaywrightPageLayoutDuration       MetricConfig `mapstructure:"playwright.page.layout.duration"`
+	PlaywrightPageRecalcStyleCount     MetricConfig `mapstructure:"playwright.page.recalc_style.count"`
+	PlaywrightPageRecalcStyleDuration  MetricConfig `mapstructure:"playwright.page.recalc_style.duration"`
+	PlaywrightPageScriptDuration       MetricConfig `mapstructure:"playwright.page.script.duration"`
+	PlaywrightPageTaskDuration         MetricConfig `mapstructure:"playwright.page.task.duration"`
+	PlaywrightTargetsCount             MetricConfig `mapstructure:"playwright.targets.count"`
 }
 
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
+		PlaywrightPageDocumentCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageDomNodeCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageFrameCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageJsEventListenerCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageJsHeapTotalSize: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageJsHeapUsedSize: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageLayoutCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageLayoutDuration: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageRecalcStyleCount: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageRecalcStyleDuration: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageScriptDuration: MetricConfig{
+			Enabled: true,
+		},
+		PlaywrightPageTaskDuration: MetricConfig{
+			Enabled: true,
+		},
 		PlaywrightTargetsCount: MetricConfig{
 			Enabled: true,
 		},

@@ -11,6 +11,716 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 )
 
+var MetricsInfo = metricsInfo{
+	PlaywrightPageDocumentCount: metricInfo{
+		Name: "playwright.page.document.count",
+	},
+	PlaywrightPageDomNodeCount: metricInfo{
+		Name: "playwright.page.dom_node.count",
+	},
+	PlaywrightPageFrameCount: metricInfo{
+		Name: "playwright.page.frame.count",
+	},
+	PlaywrightPageJsEventListenerCount: metricInfo{
+		Name: "playwright.page.js_event_listener.count",
+	},
+	PlaywrightPageJsHeapTotalSize: metricInfo{
+		Name: "playwright.page.js_heap.total_size",
+	},
+	PlaywrightPageJsHeapUsedSize: metricInfo{
+		Name: "playwright.page.js_heap.used_size",
+	},
+	PlaywrightPageLayoutCount: metricInfo{
+		Name: "playwright.page.layout.count",
+	},
+	PlaywrightPageLayoutDuration: metricInfo{
+		Name: "playwright.page.layout.duration",
+	},
+	PlaywrightPageRecalcStyleCount: metricInfo{
+		Name: "playwright.page.recalc_style.count",
+	},
+	PlaywrightPageRecalcStyleDuration: metricInfo{
+		Name: "playwright.page.recalc_style.duration",
+	},
+	PlaywrightPageScriptDuration: metricInfo{
+		Name: "playwright.page.script.duration",
+	},
+	PlaywrightPageTaskDuration: metricInfo{
+		Name: "playwright.page.task.duration",
+	},
+	PlaywrightTargetsCount: metricInfo{
+		Name: "playwright.targets.count",
+	},
+}
+
+type metricsInfo struct {
+	PlaywrightPageDocumentCount        metricInfo
+	PlaywrightPageDomNodeCount         metricInfo
+	PlaywrightPageFrameCount           metricInfo
+	PlaywrightPageJsEventListenerCount metricInfo
+	PlaywrightPageJsHeapTotalSize      metricInfo
+	PlaywrightPageJsHeapUsedSize       metricInfo
+	PlaywrightPageLayoutCount          metricInfo
+	PlaywrightPageLayoutDuration       metricInfo
+	PlaywrightPageRecalcStyleCount     metricInfo
+	PlaywrightPageRecalcStyleDuration  metricInfo
+	PlaywrightPageScriptDuration       metricInfo
+	PlaywrightPageTaskDuration         metricInfo
+	PlaywrightTargetsCount             metricInfo
+}
+
+type metricInfo struct {
+	Name string
+}
+
+type metricPlaywrightPageDocumentCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.document.count metric with initial data.
+func (m *metricPlaywrightPageDocumentCount) init() {
+	m.data.SetName("playwright.page.document.count")
+	m.data.SetDescription("Number of documents in the page.")
+	m.data.SetUnit("{document}")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageDocumentCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageDocumentCount) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageDocumentCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageDocumentCount(cfg MetricConfig) metricPlaywrightPageDocumentCount {
+	m := metricPlaywrightPageDocumentCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageDomNodeCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.dom_node.count metric with initial data.
+func (m *metricPlaywrightPageDomNodeCount) init() {
+	m.data.SetName("playwright.page.dom_node.count")
+	m.data.SetDescription("Number of DOM nodes in the page.")
+	m.data.SetUnit("{node}")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageDomNodeCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageDomNodeCount) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageDomNodeCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageDomNodeCount(cfg MetricConfig) metricPlaywrightPageDomNodeCount {
+	m := metricPlaywrightPageDomNodeCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageFrameCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.frame.count metric with initial data.
+func (m *metricPlaywrightPageFrameCount) init() {
+	m.data.SetName("playwright.page.frame.count")
+	m.data.SetDescription("Number of frames in the page.")
+	m.data.SetUnit("{frame}")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageFrameCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageFrameCount) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageFrameCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageFrameCount(cfg MetricConfig) metricPlaywrightPageFrameCount {
+	m := metricPlaywrightPageFrameCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageJsEventListenerCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.js_event_listener.count metric with initial data.
+func (m *metricPlaywrightPageJsEventListenerCount) init() {
+	m.data.SetName("playwright.page.js_event_listener.count")
+	m.data.SetDescription("Number of JavaScript event listeners in the page.")
+	m.data.SetUnit("{listener}")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageJsEventListenerCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageJsEventListenerCount) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageJsEventListenerCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageJsEventListenerCount(cfg MetricConfig) metricPlaywrightPageJsEventListenerCount {
+	m := metricPlaywrightPageJsEventListenerCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageJsHeapTotalSize struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.js_heap.total_size metric with initial data.
+func (m *metricPlaywrightPageJsHeapTotalSize) init() {
+	m.data.SetName("playwright.page.js_heap.total_size")
+	m.data.SetDescription("Total JavaScript heap size.")
+	m.data.SetUnit("By")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageJsHeapTotalSize) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageJsHeapTotalSize) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageJsHeapTotalSize) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageJsHeapTotalSize(cfg MetricConfig) metricPlaywrightPageJsHeapTotalSize {
+	m := metricPlaywrightPageJsHeapTotalSize{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageJsHeapUsedSize struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.js_heap.used_size metric with initial data.
+func (m *metricPlaywrightPageJsHeapUsedSize) init() {
+	m.data.SetName("playwright.page.js_heap.used_size")
+	m.data.SetDescription("Used JavaScript heap size.")
+	m.data.SetUnit("By")
+	m.data.SetEmptyGauge()
+	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageJsHeapUsedSize) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageJsHeapUsedSize) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageJsHeapUsedSize) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageJsHeapUsedSize(cfg MetricConfig) metricPlaywrightPageJsHeapUsedSize {
+	m := metricPlaywrightPageJsHeapUsedSize{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageLayoutCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.layout.count metric with initial data.
+func (m *metricPlaywrightPageLayoutCount) init() {
+	m.data.SetName("playwright.page.layout.count")
+	m.data.SetDescription("Cumulative count of full or partial page layouts.")
+	m.data.SetUnit("{layout}")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageLayoutCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageLayoutCount) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageLayoutCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageLayoutCount(cfg MetricConfig) metricPlaywrightPageLayoutCount {
+	m := metricPlaywrightPageLayoutCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageLayoutDuration struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.layout.duration metric with initial data.
+func (m *metricPlaywrightPageLayoutDuration) init() {
+	m.data.SetName("playwright.page.layout.duration")
+	m.data.SetDescription("Cumulative duration of page layout operations.")
+	m.data.SetUnit("s")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageLayoutDuration) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetDoubleValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageLayoutDuration) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageLayoutDuration) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageLayoutDuration(cfg MetricConfig) metricPlaywrightPageLayoutDuration {
+	m := metricPlaywrightPageLayoutDuration{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageRecalcStyleCount struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.recalc_style.count metric with initial data.
+func (m *metricPlaywrightPageRecalcStyleCount) init() {
+	m.data.SetName("playwright.page.recalc_style.count")
+	m.data.SetDescription("Cumulative count of CSS style recalculations.")
+	m.data.SetUnit("{recalculation}")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageRecalcStyleCount) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageRecalcStyleCount) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageRecalcStyleCount) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageRecalcStyleCount(cfg MetricConfig) metricPlaywrightPageRecalcStyleCount {
+	m := metricPlaywrightPageRecalcStyleCount{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageRecalcStyleDuration struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.recalc_style.duration metric with initial data.
+func (m *metricPlaywrightPageRecalcStyleDuration) init() {
+	m.data.SetName("playwright.page.recalc_style.duration")
+	m.data.SetDescription("Cumulative duration of CSS style recalculations.")
+	m.data.SetUnit("s")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageRecalcStyleDuration) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetDoubleValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageRecalcStyleDuration) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageRecalcStyleDuration) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageRecalcStyleDuration(cfg MetricConfig) metricPlaywrightPageRecalcStyleDuration {
+	m := metricPlaywrightPageRecalcStyleDuration{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageScriptDuration struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.script.duration metric with initial data.
+func (m *metricPlaywrightPageScriptDuration) init() {
+	m.data.SetName("playwright.page.script.duration")
+	m.data.SetDescription("Cumulative duration of JavaScript execution.")
+	m.data.SetUnit("s")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageScriptDuration) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetDoubleValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageScriptDuration) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageScriptDuration) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageScriptDuration(cfg MetricConfig) metricPlaywrightPageScriptDuration {
+	m := metricPlaywrightPageScriptDuration{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricPlaywrightPageTaskDuration struct {
+	data     pmetric.Metric // data buffer for generated metric.
+	config   MetricConfig   // metric config provided by user.
+	capacity int            // max observed number of data points added to the metric.
+}
+
+// init fills playwright.page.task.duration metric with initial data.
+func (m *metricPlaywrightPageTaskDuration) init() {
+	m.data.SetName("playwright.page.task.duration")
+	m.data.SetDescription("Cumulative duration of all tasks.")
+	m.data.SetUnit("s")
+	m.data.SetEmptySum()
+	m.data.Sum().SetIsMonotonic(true)
+	m.data.Sum().SetAggregationTemporality(pmetric.AggregationTemporalityCumulative)
+	m.data.Sum().DataPoints().EnsureCapacity(m.capacity)
+}
+
+func (m *metricPlaywrightPageTaskDuration) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Sum().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetDoubleValue(val)
+	dp.Attributes().PutStr("playwright.endpoint", playwrightEndpointAttributeValue)
+	dp.Attributes().PutStr("target.type", targetTypeAttributeValue)
+	dp.Attributes().PutStr("target.url", targetURLAttributeValue)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricPlaywrightPageTaskDuration) updateCapacity() {
+	if m.data.Sum().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Sum().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricPlaywrightPageTaskDuration) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Sum().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricPlaywrightPageTaskDuration(cfg MetricConfig) metricPlaywrightPageTaskDuration {
+	m := metricPlaywrightPageTaskDuration{config: cfg}
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
 type metricPlaywrightTargetsCount struct {
 	data     pmetric.Metric // data buffer for generated metric.
 	config   MetricConfig   // metric config provided by user.
@@ -66,12 +776,24 @@ func newMetricPlaywrightTargetsCount(cfg MetricConfig) metricPlaywrightTargetsCo
 // MetricsBuilder provides an interface for scrapers to report metrics while taking care of all the transformations
 // required to produce metric representation defined in metadata and user config.
 type MetricsBuilder struct {
-	config                       MetricsBuilderConfig // config of the metrics builder.
-	startTime                    pcommon.Timestamp    // start time that will be applied to all recorded data points.
-	metricsCapacity              int                  // maximum observed number of metrics per resource.
-	metricsBuffer                pmetric.Metrics      // accumulates metrics data before emitting.
-	buildInfo                    component.BuildInfo  // contains version information.
-	metricPlaywrightTargetsCount metricPlaywrightTargetsCount
+	config                                   MetricsBuilderConfig // config of the metrics builder.
+	startTime                                pcommon.Timestamp    // start time that will be applied to all recorded data points.
+	metricsCapacity                          int                  // maximum observed number of metrics per resource.
+	metricsBuffer                            pmetric.Metrics      // accumulates metrics data before emitting.
+	buildInfo                                component.BuildInfo  // contains version information.
+	metricPlaywrightPageDocumentCount        metricPlaywrightPageDocumentCount
+	metricPlaywrightPageDomNodeCount         metricPlaywrightPageDomNodeCount
+	metricPlaywrightPageFrameCount           metricPlaywrightPageFrameCount
+	metricPlaywrightPageJsEventListenerCount metricPlaywrightPageJsEventListenerCount
+	metricPlaywrightPageJsHeapTotalSize      metricPlaywrightPageJsHeapTotalSize
+	metricPlaywrightPageJsHeapUsedSize       metricPlaywrightPageJsHeapUsedSize
+	metricPlaywrightPageLayoutCount          metricPlaywrightPageLayoutCount
+	metricPlaywrightPageLayoutDuration       metricPlaywrightPageLayoutDuration
+	metricPlaywrightPageRecalcStyleCount     metricPlaywrightPageRecalcStyleCount
+	metricPlaywrightPageRecalcStyleDuration  metricPlaywrightPageRecalcStyleDuration
+	metricPlaywrightPageScriptDuration       metricPlaywrightPageScriptDuration
+	metricPlaywrightPageTaskDuration         metricPlaywrightPageTaskDuration
+	metricPlaywrightTargetsCount             metricPlaywrightTargetsCount
 }
 
 // MetricBuilderOption applies changes to default metrics builder.
@@ -93,11 +815,23 @@ func WithStartTime(startTime pcommon.Timestamp) MetricBuilderOption {
 }
 func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.Settings, options ...MetricBuilderOption) *MetricsBuilder {
 	mb := &MetricsBuilder{
-		config:                       mbc,
-		startTime:                    pcommon.NewTimestampFromTime(time.Now()),
-		metricsBuffer:                pmetric.NewMetrics(),
-		buildInfo:                    settings.BuildInfo,
-		metricPlaywrightTargetsCount: newMetricPlaywrightTargetsCount(mbc.Metrics.PlaywrightTargetsCount),
+		config:                                   mbc,
+		startTime:                                pcommon.NewTimestampFromTime(time.Now()),
+		metricsBuffer:                            pmetric.NewMetrics(),
+		buildInfo:                                settings.BuildInfo,
+		metricPlaywrightPageDocumentCount:        newMetricPlaywrightPageDocumentCount(mbc.Metrics.PlaywrightPageDocumentCount),
+		metricPlaywrightPageDomNodeCount:         newMetricPlaywrightPageDomNodeCount(mbc.Metrics.PlaywrightPageDomNodeCount),
+		metricPlaywrightPageFrameCount:           newMetricPlaywrightPageFrameCount(mbc.Metrics.PlaywrightPageFrameCount),
+		metricPlaywrightPageJsEventListenerCount: newMetricPlaywrightPageJsEventListenerCount(mbc.Metrics.PlaywrightPageJsEventListenerCount),
+		metricPlaywrightPageJsHeapTotalSize:      newMetricPlaywrightPageJsHeapTotalSize(mbc.Metrics.PlaywrightPageJsHeapTotalSize),
+		metricPlaywrightPageJsHeapUsedSize:       newMetricPlaywrightPageJsHeapUsedSize(mbc.Metrics.PlaywrightPageJsHeapUsedSize),
+		metricPlaywrightPageLayoutCount:          newMetricPlaywrightPageLayoutCount(mbc.Metrics.PlaywrightPageLayoutCount),
+		metricPlaywrightPageLayoutDuration:       newMetricPlaywrightPageLayoutDuration(mbc.Metrics.PlaywrightPageLayoutDuration),
+		metricPlaywrightPageRecalcStyleCount:     newMetricPlaywrightPageRecalcStyleCount(mbc.Metrics.PlaywrightPageRecalcStyleCount),
+		metricPlaywrightPageRecalcStyleDuration:  newMetricPlaywrightPageRecalcStyleDuration(mbc.Metrics.PlaywrightPageRecalcStyleDuration),
+		metricPlaywrightPageScriptDuration:       newMetricPlaywrightPageScriptDuration(mbc.Metrics.PlaywrightPageScriptDuration),
+		metricPlaywrightPageTaskDuration:         newMetricPlaywrightPageTaskDuration(mbc.Metrics.PlaywrightPageTaskDuration),
+		metricPlaywrightTargetsCount:             newMetricPlaywrightTargetsCount(mbc.Metrics.PlaywrightTargetsCount),
 	}
 
 	for _, op := range options {
@@ -163,6 +897,18 @@ func (mb *MetricsBuilder) EmitForResource(options ...ResourceMetricsOption) {
 	ils.Scope().SetName(ScopeName)
 	ils.Scope().SetVersion(mb.buildInfo.Version)
 	ils.Metrics().EnsureCapacity(mb.metricsCapacity)
+	mb.metricPlaywrightPageDocumentCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageDomNodeCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageFrameCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageJsEventListenerCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageJsHeapTotalSize.emit(ils.Metrics())
+	mb.metricPlaywrightPageJsHeapUsedSize.emit(ils.Metrics())
+	mb.metricPlaywrightPageLayoutCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageLayoutDuration.emit(ils.Metrics())
+	mb.metricPlaywrightPageRecalcStyleCount.emit(ils.Metrics())
+	mb.metricPlaywrightPageRecalcStyleDuration.emit(ils.Metrics())
+	mb.metricPlaywrightPageScriptDuration.emit(ils.Metrics())
+	mb.metricPlaywrightPageTaskDuration.emit(ils.Metrics())
 	mb.metricPlaywrightTargetsCount.emit(ils.Metrics())
 
 	for _, op := range options {
@@ -183,6 +929,66 @@ func (mb *MetricsBuilder) Emit(options ...ResourceMetricsOption) pmetric.Metrics
 	metrics := mb.metricsBuffer
 	mb.metricsBuffer = pmetric.NewMetrics()
 	return metrics
+}
+
+// RecordPlaywrightPageDocumentCountDataPoint adds a data point to playwright.page.document.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageDocumentCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageDocumentCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageDomNodeCountDataPoint adds a data point to playwright.page.dom_node.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageDomNodeCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageDomNodeCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageFrameCountDataPoint adds a data point to playwright.page.frame.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageFrameCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageFrameCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageJsEventListenerCountDataPoint adds a data point to playwright.page.js_event_listener.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageJsEventListenerCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageJsEventListenerCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageJsHeapTotalSizeDataPoint adds a data point to playwright.page.js_heap.total_size metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageJsHeapTotalSizeDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageJsHeapTotalSize.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageJsHeapUsedSizeDataPoint adds a data point to playwright.page.js_heap.used_size metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageJsHeapUsedSizeDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageJsHeapUsedSize.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageLayoutCountDataPoint adds a data point to playwright.page.layout.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageLayoutCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageLayoutCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageLayoutDurationDataPoint adds a data point to playwright.page.layout.duration metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageLayoutDurationDataPoint(ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageLayoutDuration.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageRecalcStyleCountDataPoint adds a data point to playwright.page.recalc_style.count metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageRecalcStyleCountDataPoint(ts pcommon.Timestamp, val int64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageRecalcStyleCount.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageRecalcStyleDurationDataPoint adds a data point to playwright.page.recalc_style.duration metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageRecalcStyleDurationDataPoint(ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageRecalcStyleDuration.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageScriptDurationDataPoint adds a data point to playwright.page.script.duration metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageScriptDurationDataPoint(ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageScriptDuration.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
+}
+
+// RecordPlaywrightPageTaskDurationDataPoint adds a data point to playwright.page.task.duration metric.
+func (mb *MetricsBuilder) RecordPlaywrightPageTaskDurationDataPoint(ts pcommon.Timestamp, val float64, playwrightEndpointAttributeValue string, targetTypeAttributeValue string, targetURLAttributeValue string) {
+	mb.metricPlaywrightPageTaskDuration.recordDataPoint(mb.startTime, ts, val, playwrightEndpointAttributeValue, targetTypeAttributeValue, targetURLAttributeValue)
 }
 
 // RecordPlaywrightTargetsCountDataPoint adds a data point to playwright.targets.count metric.

@@ -59,6 +59,14 @@ type GetTargetsResult struct {
 	TargetInfos []TargetInfo `json:"targetInfos"`
 }
 
+// PageInfo tracks a Playwright page object
+type PageInfo struct {
+	GUID        string
+	ContextGUID string
+	FrameGUID   string
+	URL         string
+}
+
 // ReconnectCallback is called when a reconnection happens
 type ReconnectCallback func() error
 
@@ -75,6 +83,11 @@ type PlaywrightClient struct {
 	reconnectChan     chan struct{}
 	autoReconnect     bool
 	reconnectCallback ReconnectCallback
+
+	// Tracked Playwright objects from __create__ events
+	pagesMu  sync.RWMutex
+	pages    map[string]*PageInfo // pageGUID → PageInfo
+	contexts map[string]string    // contextGUID → browserGUID
 }
 
 // NewPlaywrightClient creates a new Playwright client
@@ -86,6 +99,8 @@ func NewPlaywrightClient(endpoint string, logger *zap.Logger) *PlaywrightClient 
 		closeChan:     make(chan struct{}),
 		reconnectChan: make(chan struct{}, 1),
 		autoReconnect: true,
+		pages:         make(map[string]*PageInfo),
+		contexts:      make(map[string]string),
 	}
 }
 
@@ -95,7 +110,7 @@ func (c *PlaywrightClient) Connect(ctx context.Context) error {
 	defer c.mu.Unlock()
 
 	if c.conn != nil {
-		return nil // Already connected
+		return nil
 	}
 
 	dialer := websocket.DefaultDialer
@@ -107,10 +122,7 @@ func (c *PlaywrightClient) Connect(ctx context.Context) error {
 	c.conn = conn
 	c.closed = false
 
-	// Start reading responses in a goroutine
 	go c.readResponses()
-
-	// Start the reconnection handler goroutine
 	go c.handleReconnection()
 
 	return nil
@@ -142,7 +154,6 @@ func (c *PlaywrightClient) Disconnect() error {
 	c.closed = true
 	close(c.closeChan)
 
-	// Close all pending response channels
 	for _, ch := range c.responses {
 		close(ch)
 	}
@@ -153,21 +164,27 @@ func (c *PlaywrightClient) Disconnect() error {
 	return err
 }
 
-// handleReconnection handles automatic reconnection when the WebSocket connection is lost
+// Pages returns a snapshot of all tracked page objects
+func (c *PlaywrightClient) Pages() []*PageInfo {
+	c.pagesMu.RLock()
+	defer c.pagesMu.RUnlock()
+
+	pages := make([]*PageInfo, 0, len(c.pages))
+	for _, p := range c.pages {
+		pages = append(pages, p)
+	}
+	return pages
+}
+
 func (c *PlaywrightClient) handleReconnection() {
 	for {
 		select {
 		case <-c.reconnectChan:
 			c.logger.Info("Starting automatic reconnection...")
-
-			// Wait a bit before attempting to reconnect
 			time.Sleep(2 * time.Second)
 
-			// Attempt to reconnect
 			if err := c.reconnectInternal(); err != nil {
 				c.logger.Error("Failed to reconnect", zap.Error(err))
-
-				// Schedule another reconnection attempt
 				select {
 				case c.reconnectChan <- struct{}{}:
 				default:
@@ -175,7 +192,6 @@ func (c *PlaywrightClient) handleReconnection() {
 			} else {
 				c.logger.Info("Successfully reconnected to Playwright server")
 
-				// Call reconnect callback if set
 				c.mu.Lock()
 				callback := c.reconnectCallback
 				c.mu.Unlock()
@@ -183,53 +199,43 @@ func (c *PlaywrightClient) handleReconnection() {
 				if callback != nil {
 					if err := callback(); err != nil {
 						c.logger.Error("Reconnect callback failed", zap.Error(err))
-					} else {
-						c.logger.Info("Reconnect callback completed successfully")
 					}
 				}
 			}
 
 		case <-c.closeChan:
-			c.logger.Debug("Reconnection handler shutting down")
 			return
 		}
 	}
 }
 
-// reconnectInternal performs the actual reconnection logic
 func (c *PlaywrightClient) reconnectInternal() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// Close existing connection if any
 	if c.conn != nil {
 		c.conn.Close()
 		c.conn = nil
 	}
 
-	// Don't reconnect if client is explicitly closed
 	if c.closed {
 		return fmt.Errorf("client is closed")
 	}
 
-	// Create a context with timeout for reconnection
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Attempt to establish new connection
 	conn, _, err := websocket.DefaultDialer.DialContext(ctx, c.endpoint, nil)
 	if err != nil {
 		return fmt.Errorf("failed to reconnect to Playwright endpoint %s: %w", c.endpoint, err)
 	}
 
-	// Update connection and restart reader
 	c.conn = conn
 	go c.readResponses()
 
 	return nil
 }
 
-// sendMessage sends a Playwright message and waits for response
 func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method string, params interface{}, metadata interface{}) (*PlaywrightResponse, error) {
 	c.mu.Lock()
 	if c.conn == nil || c.closed {
@@ -251,13 +257,11 @@ func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method 
 		c.mu.Unlock()
 	}()
 
-	// Convert params to map[string]interface{}
 	var paramsMap map[string]interface{}
 	if params != nil {
 		if pm, ok := params.(map[string]interface{}); ok {
 			paramsMap = pm
 		} else if ps, ok := params.(map[string]string); ok {
-			// Convert map[string]string to map[string]interface{}
 			paramsMap = make(map[string]interface{})
 			for k, v := range ps {
 				paramsMap[k] = v
@@ -267,7 +271,6 @@ func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method 
 		}
 	}
 
-	// Convert metadata to map[string]interface{}
 	var metadataMap map[string]interface{}
 	if metadata != nil {
 		if mm, ok := metadata.(map[string]interface{}); ok {
@@ -285,7 +288,6 @@ func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method 
 		Metadata: metadataMap,
 	}
 
-	// Send the message
 	c.mu.Lock()
 	err := c.conn.WriteJSON(msg)
 	c.mu.Unlock()
@@ -293,10 +295,9 @@ func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method 
 		return nil, fmt.Errorf("failed to send Playwright message: %w", err)
 	}
 
-	// Wait for response
 	select {
 	case resp := <-respChan:
-		if resp.Error != nil {
+		if resp.Error != nil && (resp.Error.Code != 0 || resp.Error.Message != "") {
 			return nil, fmt.Errorf("Playwright error: %s (code: %d)", resp.Error.Message, resp.Error.Code)
 		}
 		return &resp, nil
@@ -307,7 +308,60 @@ func (c *PlaywrightClient) sendMessage(ctx context.Context, guid string, method 
 	}
 }
 
-// readResponses reads responses from the WebSocket connection
+// handleCreateEvent processes __create__ events to track pages and contexts
+func (c *PlaywrightClient) handleCreateEvent(event PlaywrightEvent) {
+	if event.Method != "__create__" || event.Params == nil {
+		return
+	}
+
+	objType, _ := event.Params["type"].(string)
+	objGUID, _ := event.Params["guid"].(string)
+	if objGUID == "" {
+		return
+	}
+
+	switch objType {
+	case "BrowserContext":
+		c.pagesMu.Lock()
+		c.contexts[objGUID] = event.GUID
+		c.pagesMu.Unlock()
+		c.logger.Debug("Tracked BrowserContext", zap.String("guid", objGUID))
+
+	case "Page":
+		info := &PageInfo{
+			GUID:        objGUID,
+			ContextGUID: event.GUID,
+		}
+		if initializer, ok := event.Params["initializer"].(map[string]interface{}); ok {
+			if mainFrame, ok := initializer["mainFrame"].(map[string]interface{}); ok {
+				if url, ok := mainFrame["url"].(string); ok {
+					info.URL = url
+				}
+				if guid, ok := mainFrame["guid"].(string); ok {
+					info.FrameGUID = guid
+				}
+			}
+		}
+		c.pagesMu.Lock()
+		c.pages[objGUID] = info
+		c.pagesMu.Unlock()
+		c.logger.Debug("Tracked Page", zap.String("guid", objGUID),
+			zap.String("url", info.URL), zap.String("frameGUID", info.FrameGUID))
+	}
+}
+
+// handleDestroyEvent processes __dispose__ events to remove tracked objects
+func (c *PlaywrightClient) handleDestroyEvent(event PlaywrightEvent) {
+	if event.Method != "__dispose__" {
+		return
+	}
+
+	c.pagesMu.Lock()
+	defer c.pagesMu.Unlock()
+	delete(c.pages, event.GUID)
+	delete(c.contexts, event.GUID)
+}
+
 func (c *PlaywrightClient) readResponses() {
 	for {
 		c.mu.Lock()
@@ -317,73 +371,58 @@ func (c *PlaywrightClient) readResponses() {
 		}
 		c.mu.Unlock()
 
-		// Read raw message first to determine if it's a response or event
 		_, rawMessage, err := c.conn.ReadMessage()
 		if err != nil {
 			c.logger.Warn("WebSocket connection lost", zap.Error(err))
 
-			// Trigger reconnection if auto-reconnect is enabled
 			c.mu.Lock()
 			if c.autoReconnect && !c.closed {
-				c.logger.Info("Triggering automatic reconnection...")
 				select {
 				case c.reconnectChan <- struct{}{}:
 				default:
-					// Channel is full, reconnection already pending
 				}
 			}
 			c.mu.Unlock()
 			return
 		}
 
-		// Try to parse as response first
 		var resp PlaywrightResponse
 		if err := json.Unmarshal(rawMessage, &resp); err == nil && (resp.ID != 0 || len(resp.Result) > 0 || resp.Error != nil) {
-			// This is a response message
 			c.mu.Lock()
-			// First, try to send to the specific ID channel
 			if respChan, exists := c.responses[resp.ID]; exists {
 				select {
 				case respChan <- resp:
 				default:
-					c.logger.Warn("Response channel full, dropping response", zap.Int("id", resp.ID))
 				}
-			} else {
-				c.logger.Debug("Received response for unknown ID", zap.Int("id", resp.ID))
 			}
-
-			// Also send to the initialize channel if it exists and the response has a result
 			if len(resp.Result) > 0 {
 				if initChan, exists := c.responses[-1]; exists {
 					select {
 					case initChan <- resp:
 					default:
-						// Don't log warning for initialize channel, it's expected to be busy
 					}
 				}
 			}
 			c.mu.Unlock()
 		} else {
-			// Try to parse as event
 			var event PlaywrightEvent
 			if err := json.Unmarshal(rawMessage, &event); err == nil && event.Method != "" {
-				// This is an event message - forward to initialize channel if it exists
+				// Track pages/contexts from create/dispose events
+				c.handleCreateEvent(event)
+				c.handleDestroyEvent(event)
+
 				c.mu.Lock()
 				if initChan, exists := c.responses[-1]; exists {
-					// Convert event to response format for the initialize handler
 					eventResp := PlaywrightResponse{
-						ID:     -999,       // Special ID to indicate this is an event
-						Result: rawMessage, // Pass the raw event data
+						ID:     -999,
+						Result: rawMessage,
 					}
 					select {
 					case initChan <- eventResp:
 					default:
-						// Don't log warning for initialize channel, it's expected to be busy
 					}
 				}
 				c.mu.Unlock()
-			} else {
-				c.logger.Debug("Received unknown message format", zap.String("message", string(rawMessage)))
 			}
 		}
 	}
@@ -425,12 +464,9 @@ type NewBrowserCDPSessionResult struct {
 
 // Initialize calls the initialize Playwright method and waits for the Playwright object to be ready
 func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, error) {
-	// Create a special response channel to listen for any response with a result field
-	initRespChan := make(chan PlaywrightResponse, 50) // Buffer for multiple setup messages
+	initRespChan := make(chan PlaywrightResponse, 50)
 
-	// Add a temporary "catch-all" response handler that forwards any response with a result
 	c.mu.Lock()
-	// Use a negative ID that won't conflict with normal message IDs
 	initResponseID := -1
 	c.responses[initResponseID] = initRespChan
 	c.mu.Unlock()
@@ -442,7 +478,6 @@ func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, e
 		c.mu.Unlock()
 	}()
 
-	// Prepare the initialize message
 	params := map[string]string{"sdkLanguage": "python"}
 	wallTime := time.Now().UnixMilli()
 	metadata := map[string]interface{}{
@@ -451,22 +486,18 @@ func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, e
 		"internal": false,
 	}
 
-	// Send the initialize message using sendMessage and get immediate response
 	resp, err := c.sendMessage(ctx, "", "initialize", params, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send initialize message: %w", err)
 	}
 
-	c.logger.Debug("Sent initialize message", zap.Int64("wallTime", wallTime))
-
-	// Check if the direct response contains the Playwright initialization
 	var result InitializeResult
 	if err := json.Unmarshal(resp.Result, &result); err == nil {
 		if result.Playwright.GUID == "Playwright" {
-			c.logger.Debug("Successfully received Playwright initialize response via direct response",
+			c.logger.Debug("Successfully received Playwright initialize response",
 				zap.String("guid", result.Playwright.GUID))
 
-			// Listen for browser creation events for a short time
+			// Wait for browser/context/page creation events
 			eventCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 			defer cancel()
 
@@ -475,13 +506,10 @@ func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, e
 					select {
 					case resp := <-initRespChan:
 						if resp.ID == -999 {
-							// This is an event
 							var event PlaywrightEvent
 							if err := json.Unmarshal(resp.Result, &event); err == nil {
 								if event.Method == "__create__" && event.Params != nil {
 									if eventType, ok := event.Params["type"].(string); ok && eventType == "Browser" {
-										c.logger.Debug("Found Browser creation event")
-										// Extract browser information
 										browserInfo := &BrowserInfo{
 											GUID: event.Params["guid"].(string),
 											Type: eventType,
@@ -510,9 +538,7 @@ func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, e
 				}
 			}()
 
-			// Wait a bit for browser events
 			<-eventCtx.Done()
-
 			return &result, nil
 		}
 	}
@@ -520,96 +546,8 @@ func (c *PlaywrightClient) Initialize(ctx context.Context) (*InitializeResult, e
 	return nil, fmt.Errorf("failed to parse initialize response")
 }
 
-// Initialize method state to track browser info
-type initializeState struct {
-	result      *InitializeResult
-	browserInfo *BrowserInfo
-}
-
-// checkInitializeResponse checks if a response contains the expected Playwright initialization result
-func (c *PlaywrightClient) checkInitializeResponse(resp PlaywrightResponse, messageCount int, state *initializeState) *InitializeResult {
-	c.logger.Debug("Received response during initialize",
-		zap.Int("messageCount", messageCount),
-		zap.Int("responseId", resp.ID),
-		zap.String("result", string(resp.Result)),
-		zap.Any("error", resp.Error))
-
-	if resp.Error != nil {
-		c.logger.Debug("Received error response", zap.Any("error", resp.Error))
-		if resp.Error.Message == "" && resp.Error.Code == 0 {
-			return nil // Skip empty errors
-		}
-		return nil
-	}
-
-	// Check if this is an event message (ID -999)
-	if resp.ID == -999 {
-		// This is an event - try to parse as PlaywrightEvent
-		var event PlaywrightEvent
-		if err := json.Unmarshal(resp.Result, &event); err == nil {
-			c.logger.Debug("Received event during initialize",
-				zap.String("method", event.Method),
-				zap.String("guid", event.GUID),
-				zap.Any("params", event.Params))
-
-			// Check if this is a Browser creation event
-			if event.Method == "__create__" && event.Params != nil {
-				if eventType, ok := event.Params["type"].(string); ok && eventType == "Browser" {
-					c.logger.Debug("Found Browser creation event")
-
-					// Extract browser information
-					browserInfo := &BrowserInfo{
-						GUID: event.Params["guid"].(string),
-						Type: eventType,
-					}
-
-					// Extract initializer info if present
-					if initializer, ok := event.Params["initializer"].(map[string]interface{}); ok {
-						browserInfo.Initializer = initializer
-						if name, ok := initializer["name"].(string); ok {
-							browserInfo.Name = name
-						}
-						if version, ok := initializer["version"].(string); ok {
-							browserInfo.Version = version
-						}
-					}
-
-					state.browserInfo = browserInfo
-					c.logger.Debug("Captured Browser info",
-						zap.String("guid", browserInfo.GUID),
-						zap.String("name", browserInfo.Name),
-						zap.String("version", browserInfo.Version))
-				}
-			}
-		}
-		return nil // Events don't complete initialization
-	}
-
-	// Try to parse the result as InitializeResult
-	var result InitializeResult
-	if err := json.Unmarshal(resp.Result, &result); err == nil {
-		// Check if this is the expected Playwright initialize response
-		if result.Playwright.GUID == "Playwright" {
-			// Add captured browser info if we have it
-			if state.browserInfo != nil {
-				result.BrowserInfo = state.browserInfo
-			}
-
-			c.logger.Debug("Successfully received Playwright initialize response",
-				zap.String("guid", result.Playwright.GUID),
-				zap.Int("responseId", resp.ID),
-				zap.Int("totalMessages", messageCount),
-				zap.Any("browserInfo", result.BrowserInfo))
-			return &result
-		}
-	}
-
-	return nil
-}
-
 // NewBrowserCDPSession creates a new CDP session for the given browser GUID
 func (c *PlaywrightClient) NewBrowserCDPSession(ctx context.Context, browserGUID string) (*NewBrowserCDPSessionResult, error) {
-	// Prepare metadata with the required apiName
 	wallTime := time.Now().UnixMilli()
 	metadata := map[string]interface{}{
 		"wallTime": wallTime,
@@ -617,7 +555,6 @@ func (c *PlaywrightClient) NewBrowserCDPSession(ctx context.Context, browserGUID
 		"internal": false,
 	}
 
-	// Send the newBrowserCDPSession command
 	resp, err := c.sendMessage(ctx, browserGUID, "newBrowserCDPSession", nil, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new browser CDP session: %w", err)
@@ -628,26 +565,47 @@ func (c *PlaywrightClient) NewBrowserCDPSession(ctx context.Context, browserGUID
 		return nil, fmt.Errorf("failed to unmarshal newBrowserCDPSession result: %w", err)
 	}
 
-	c.logger.Debug("Successfully created new browser CDP session",
-		zap.String("browserGUID", browserGUID),
-		zap.String("sessionGUID", result.Session.GUID),
-		zap.Int64("wallTime", wallTime))
+	return &result, nil
+}
+
+// NewPageCDPSession creates a CDP session for a specific page through its BrowserContext.
+// This returns a CDPSession GUID that can be used to send page-level CDP commands.
+func (c *PlaywrightClient) NewPageCDPSession(ctx context.Context, contextGUID string, pageGUID string) (*NewBrowserCDPSessionResult, error) {
+	wallTime := time.Now().UnixMilli()
+	metadata := map[string]interface{}{
+		"wallTime": wallTime,
+		"apiName":  "BrowserContext.new_cdp_session",
+		"internal": false,
+	}
+
+	params := map[string]interface{}{
+		"page": map[string]interface{}{
+			"guid": pageGUID,
+		},
+	}
+
+	resp, err := c.sendMessage(ctx, contextGUID, "newCDPSession", params, metadata)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create page CDP session for %s: %w", pageGUID, err)
+	}
+
+	var result NewBrowserCDPSessionResult
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal newCDPSession result: %w", err)
+	}
 
 	return &result, nil
 }
 
 // sendCDPMessage sends a CDP message through the session and waits for a response
 func (c *PlaywrightClient) sendCDPMessage(ctx context.Context, sessionGUID string, cdpMethod string, cdpParams interface{}, metadata interface{}) (*PlaywrightResponse, error) {
-	// Prepare wall time for metadata
 	wallTime := time.Now().UnixMilli()
 
-	// Create the wrapped params for the CDP message
 	wrappedParams := map[string]interface{}{
 		"method": cdpMethod,
 		"params": cdpParams,
 	}
 
-	// Prepare metadata if not provided
 	if metadata == nil {
 		metadata = map[string]interface{}{
 			"wallTime": wallTime,
@@ -656,50 +614,27 @@ func (c *PlaywrightClient) sendCDPMessage(ctx context.Context, sessionGUID strin
 		}
 	}
 
-	// Send the command using sendMessage method with "send" as the method and wait for response
 	resp, err := c.sendMessage(ctx, sessionGUID, "send", wrappedParams, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send CDP message %s: %w", cdpMethod, err)
 	}
-
-	c.logger.Debug("Successfully sent CDP message and received response",
-		zap.String("sessionGUID", sessionGUID),
-		zap.String("cdpMethod", cdpMethod),
-		zap.Int64("wallTime", wallTime),
-		zap.String("response", string(resp.Result)))
 
 	return resp, nil
 }
 
 // GetTargetsViaCDP calls Target.getTargets using the CDP session and returns the response
 func (c *PlaywrightClient) GetTargetsViaCDP(ctx context.Context, sessionGUID string) (*PlaywrightResponse, error) {
-	// Prepare wall time for metadata
-	wallTime := time.Now().UnixMilli()
-
-	// Prepare metadata for the CDP command
 	metadata := map[string]interface{}{
-		"wallTime": wallTime,
+		"wallTime": time.Now().UnixMilli(),
 		"apiName":  "CDPSession.send",
 		"internal": false,
 	}
 
-	// Prepare parameters for Target.getTargets with default filter
 	params := map[string]interface{}{
 		"filter": []interface{}{map[string]interface{}{}},
 	}
 
-	// Send Target.getTargets command via CDP session
-	resp, err := c.sendCDPMessage(ctx, sessionGUID, "Target.getTargets", params, metadata)
-	if err != nil {
-		return nil, fmt.Errorf("failed to send Target.getTargets via CDP: %w", err)
-	}
-
-	c.logger.Debug("Successfully sent Target.getTargets via CDP and received response",
-		zap.String("sessionGUID", sessionGUID),
-		zap.Int64("wallTime", wallTime),
-		zap.String("response", string(resp.Result)))
-
-	return resp, nil
+	return c.sendCDPMessage(ctx, sessionGUID, "Target.getTargets", params, metadata)
 }
 
 // AttachToTargetResult represents the result of Target.attachToTarget command
@@ -709,41 +644,28 @@ type AttachToTargetResult struct {
 
 // AttachToTarget attaches to a target using CDP and returns the session ID
 func (c *PlaywrightClient) AttachToTarget(ctx context.Context, sessionGUID string, targetID string) (*AttachToTargetResult, error) {
-	// Prepare wall time for metadata
-	wallTime := time.Now().UnixMilli()
-
-	// Prepare metadata for the CDP command
 	metadata := map[string]interface{}{
-		"wallTime": wallTime,
+		"wallTime": time.Now().UnixMilli(),
 		"apiName":  "CDPSession.send",
 		"internal": false,
 	}
 
-	// Prepare parameters for Target.attachToTarget
 	params := map[string]interface{}{
 		"targetId": targetID,
 		"flatten":  true,
 	}
 
-	// Send Target.attachToTarget command via CDP session
 	resp, err := c.sendCDPMessage(ctx, sessionGUID, "Target.attachToTarget", params, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("failed to attach to target %s: %w", targetID, err)
 	}
 
-	// Parse the response to extract the session ID
 	var result struct {
 		Result AttachToTargetResult `json:"result"`
 	}
 	if err := json.Unmarshal(resp.Result, &result); err != nil {
 		return nil, fmt.Errorf("failed to parse Target.attachToTarget response: %w", err)
 	}
-
-	c.logger.Debug("Successfully attached to target",
-		zap.String("targetId", targetID),
-		zap.String("sessionId", result.Result.SessionID),
-		zap.String("sessionGUID", sessionGUID),
-		zap.Int64("wallTime", wallTime))
 
 	return &result.Result, nil
 }
@@ -759,28 +681,27 @@ type PerformanceMetricsResult struct {
 	Metrics []PerformanceMetric `json:"metrics"`
 }
 
-// GetPerformanceMetrics gets performance metrics from a target session using CDP
-func (c *PlaywrightClient) GetPerformanceMetrics(ctx context.Context, targetSessionID string) (*PerformanceMetricsResult, error) {
-	// Prepare wall time for metadata
-	wallTime := time.Now().UnixMilli()
+// EnablePerformance enables the Performance CDP domain on a session.
+// Must be called before GetPerformanceMetrics on some Chrome versions.
+func (c *PlaywrightClient) EnablePerformance(ctx context.Context, sessionGUID string) (*PlaywrightResponse, error) {
+	return c.sendCDPMessage(ctx, sessionGUID, "Performance.enable", map[string]interface{}{}, nil)
+}
 
-	// Prepare metadata for the CDP command
+// GetPerformanceMetrics gets performance metrics from a CDP session (browser or page level)
+func (c *PlaywrightClient) GetPerformanceMetrics(ctx context.Context, sessionGUID string) (*PerformanceMetricsResult, error) {
 	metadata := map[string]interface{}{
-		"wallTime": wallTime,
+		"wallTime": time.Now().UnixMilli(),
 		"apiName":  "CDPSession.send",
 		"internal": false,
 	}
 
-	// Performance.getMetrics doesn't require parameters
 	params := map[string]interface{}{}
 
-	// Send Performance.getMetrics command via target's CDP session
-	resp, err := c.sendCDPMessage(ctx, targetSessionID, "Memory.getAllTimeSamplingProfile", params, metadata)
+	resp, err := c.sendCDPMessage(ctx, sessionGUID, "Performance.getMetrics", params, metadata)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get performance metrics from session %s: %w", targetSessionID, err)
+		return nil, fmt.Errorf("failed to get performance metrics from session %s: %w", sessionGUID, err)
 	}
 
-	// Parse the response to extract the performance metrics
 	var result struct {
 		Result PerformanceMetricsResult `json:"result"`
 	}
@@ -788,10 +709,110 @@ func (c *PlaywrightClient) GetPerformanceMetrics(ctx context.Context, targetSess
 		return nil, fmt.Errorf("failed to parse Performance.getMetrics response: %w", err)
 	}
 
-	c.logger.Debug("Successfully retrieved performance metrics",
-		zap.String("targetSessionId", targetSessionID),
-		zap.Int("metricsCount", len(result.Result.Metrics)),
-		zap.Int64("wallTime", wallTime))
-
 	return &result.Result, nil
+}
+
+// NewBrowserContext creates a new BrowserContext through the Playwright protocol.
+// Returns the context GUID.
+func (c *PlaywrightClient) NewBrowserContext(ctx context.Context, browserGUID string) (string, error) {
+	metadata := map[string]interface{}{
+		"wallTime": time.Now().UnixMilli(),
+		"apiName":  "Browser.new_context",
+		"internal": false,
+	}
+
+	params := map[string]interface{}{
+		"noDefaultViewport": false,
+	}
+
+	resp, err := c.sendMessage(ctx, browserGUID, "newContext", params, metadata)
+	if err != nil {
+		return "", fmt.Errorf("failed to create browser context: %w", err)
+	}
+
+	var result struct {
+		Context struct {
+			GUID string `json:"guid"`
+		} `json:"context"`
+	}
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		return "", fmt.Errorf("failed to parse newContext result: %w", err)
+	}
+
+	c.logger.Debug("Created BrowserContext", zap.String("guid", result.Context.GUID))
+	return result.Context.GUID, nil
+}
+
+// NewPage creates a new Page in the given BrowserContext through the Playwright protocol.
+// The returned page GUID can be used with NewPageCDPSession.
+// The corresponding __create__ event is handled by readResponses to track the page.
+func (c *PlaywrightClient) NewPage(ctx context.Context, contextGUID string) (string, error) {
+	metadata := map[string]interface{}{
+		"wallTime": time.Now().UnixMilli(),
+		"apiName":  "BrowserContext.new_page",
+		"internal": false,
+	}
+
+	resp, err := c.sendMessage(ctx, contextGUID, "newPage", nil, metadata)
+	if err != nil {
+		return "", fmt.Errorf("failed to create page: %w", err)
+	}
+
+	var result struct {
+		Page struct {
+			GUID string `json:"guid"`
+		} `json:"page"`
+	}
+	if err := json.Unmarshal(resp.Result, &result); err != nil {
+		return "", fmt.Errorf("failed to parse newPage result: %w", err)
+	}
+
+	c.logger.Debug("Created Page", zap.String("guid", result.Page.GUID))
+	return result.Page.GUID, nil
+}
+
+// NavigatePage navigates a page's main frame to the given URL.
+func (c *PlaywrightClient) NavigatePage(ctx context.Context, pageGUID string, url string) error {
+	metadata := map[string]interface{}{
+		"wallTime": time.Now().UnixMilli(),
+		"apiName":  "Frame.goto",
+		"internal": false,
+	}
+
+	// Find the main frame GUID for this page
+	c.pagesMu.RLock()
+	page, exists := c.pages[pageGUID]
+	c.pagesMu.RUnlock()
+
+	if !exists {
+		// Wait briefly for __create__ events to arrive
+		time.Sleep(200 * time.Millisecond)
+		c.pagesMu.RLock()
+		page, exists = c.pages[pageGUID]
+		c.pagesMu.RUnlock()
+	}
+
+	// Use the page's frame GUID if available, otherwise try sending to the page directly
+	targetGUID := pageGUID
+	if exists && page.FrameGUID != "" {
+		targetGUID = page.FrameGUID
+	}
+
+	params := map[string]interface{}{
+		"url":       url,
+		"waitUntil": "load",
+	}
+
+	_, err := c.sendMessage(ctx, targetGUID, "goto", params, metadata)
+	if err != nil {
+		return err
+	}
+
+	c.pagesMu.Lock()
+	if p, ok := c.pages[pageGUID]; ok {
+		p.URL = url
+	}
+	c.pagesMu.Unlock()
+
+	return nil
 }

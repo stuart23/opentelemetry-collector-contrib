@@ -12,6 +12,198 @@ metrics:
     enabled: false
 ```
 
+### playwright.page.document.count
+
+Number of documents in the page.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| {document} | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.dom_node.count
+
+Number of DOM nodes in the page.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| {node} | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.frame.count
+
+Number of frames in the page.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| {frame} | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.js_event_listener.count
+
+Number of JavaScript event listeners in the page.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| {listener} | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.js_heap.total_size
+
+Total JavaScript heap size.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| By | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.js_heap.used_size
+
+Used JavaScript heap size.
+
+| Unit | Metric Type | Value Type |
+| ---- | ----------- | ---------- |
+| By | Gauge | Int |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.layout.count
+
+Cumulative count of full or partial page layouts.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| {layout} | Sum | Int | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.layout.duration
+
+Cumulative duration of page layout operations.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| s | Sum | Double | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.recalc_style.count
+
+Cumulative count of CSS style recalculations.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| {recalculation} | Sum | Int | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.recalc_style.duration
+
+Cumulative duration of CSS style recalculations.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| s | Sum | Double | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.script.duration
+
+Cumulative duration of JavaScript execution.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| s | Sum | Double | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
+### playwright.page.task.duration
+
+Cumulative duration of all tasks.
+
+| Unit | Metric Type | Value Type | Aggregation Temporality | Monotonic |
+| ---- | ----------- | ---------- | ----------------------- | --------- |
+| s | Sum | Double | Cumulative | true |
+
+#### Attributes
+
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |
+| target.url | The URL of the browser target. | Any Str | false |
+
 ### playwright.targets.count
 
 Number of active targets reported by Playwright.
@@ -22,7 +214,7 @@ Number of active targets reported by Playwright.
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str |
-| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str |
+| Name | Description | Values | Optional |
+| ---- | ----------- | ------ | -------- |
+| playwright.endpoint | Playwright WebSocket endpoint URL. | Any Str | false |
+| target.type | The type of the target (page, background_page, service_worker, browser, etc). | Any Str | false |

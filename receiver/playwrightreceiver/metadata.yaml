@@ -18,6 +18,9 @@ attributes:
   target.type:
     description: The type of the target (page, background_page, service_worker, browser, etc).
     type: string
+  target.url:
+    description: The URL of the browser target.
+    type: string
 
 metrics:
   playwright.targets.count:
@@ -27,6 +30,114 @@ metrics:
       value_type: int
     unit: "{target}"
     attributes: [ playwright.endpoint, target.type ]
+
+  playwright.page.document.count:
+    description: Number of documents in the page.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: "{document}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.frame.count:
+    description: Number of frames in the page.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: "{frame}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.js_event_listener.count:
+    description: Number of JavaScript event listeners in the page.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: "{listener}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.dom_node.count:
+    description: Number of DOM nodes in the page.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: "{node}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.layout.count:
+    description: Cumulative count of full or partial page layouts.
+    enabled: true
+    sum:
+      value_type: int
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: "{layout}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.recalc_style.count:
+    description: Cumulative count of CSS style recalculations.
+    enabled: true
+    sum:
+      value_type: int
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: "{recalculation}"
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.layout.duration:
+    description: Cumulative duration of page layout operations.
+    enabled: true
+    sum:
+      value_type: double
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: s
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.recalc_style.duration:
+    description: Cumulative duration of CSS style recalculations.
+    enabled: true
+    sum:
+      value_type: double
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: s
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.script.duration:
+    description: Cumulative duration of JavaScript execution.
+    enabled: true
+    sum:
+      value_type: double
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: s
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.task.duration:
+    description: Cumulative duration of all tasks.
+    enabled: true
+    sum:
+      value_type: double
+      monotonic: true
+      aggregation_temporality: cumulative
+    unit: s
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.js_heap.used_size:
+    description: Used JavaScript heap size.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: By
+    attributes: [ playwright.endpoint, target.type, target.url ]
+
+  playwright.page.js_heap.total_size:
+    description: Total JavaScript heap size.
+    enabled: true
+    gauge:
+      value_type: int
+    unit: By
+    attributes: [ playwright.endpoint, target.type, target.url ]
 
 tests:
   skip_lifecycle: true

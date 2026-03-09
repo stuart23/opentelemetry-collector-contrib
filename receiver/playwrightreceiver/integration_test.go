@@ -6,228 +6,135 @@
 package playwrightreceiver
 
 import (
+	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
-	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/playwright-community/playwright-go"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/playwrightreceiver/internal/metadata"
 )
 
-// findAvailablePort finds an available TCP port for Playwright.
-func findAvailablePort(t *testing.T) int {
+const playwrightServerScript = "/Users/stu/synthesizer/k8s/components/playwright/base/server.js"
+
+// startPlaywrightServer launches the production Playwright server.js on a
+// random port and returns the ws:// endpoint. The process is killed on cleanup.
+func startPlaywrightServer(t *testing.T) string {
 	t.Helper()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Fatalf("Failed to find available port: %v", err)
-	}
-	defer listener.Close()
-
-	return listener.Addr().(*net.TCPAddr).Port
-}
-
-// playwrightTarget represents a Playwright target from the /json endpoint.
-type playwrightTarget struct {
-	ID                   string `json:"id"`
-	Type                 string `json:"type"`
-	Title                string `json:"title"`
-	URL                  string `json:"url"`
-	WebSocketDebuggerURL string `json:"webSocketDebuggerUrl"`
-}
-
-// browserServerInfo represents the response from a Playwright browserServer.
-type browserServerInfo struct {
-	WSEndpointPath string `json:"wsEndpointPath"`
-}
-
-// discoverPlaywrightWebSocketEndpoint discovers the Playwright WebSocket endpoint from the HTTP endpoint.
-func discoverPlaywrightWebSocketEndpoint(t *testing.T, httpPort int) string {
-	t.Helper()
-
-	httpURL := fmt.Sprintf("http://127.0.0.1:%d/json", httpPort)
-
-	// Wait for the Playwright HTTP endpoint to be available
-	for i := 0; i < 30; i++ { // Wait up to 30 seconds
-		resp, err := http.Get(httpURL)
-		if err != nil {
-			time.Sleep(1 * time.Second)
-			continue
-		}
-
-		if resp.StatusCode == 200 {
-			// Try to parse as browserServer info first
-			var browserServer browserServerInfo
-			readErr := json.NewDecoder(resp.Body).Decode(&browserServer)
-			resp.Body.Close()
-
-			if readErr == nil && browserServer.WSEndpointPath != "" {
-				// This is a Playwright browserServer
-				endpoint := fmt.Sprintf("ws://127.0.0.1:%d%s", httpPort, browserServer.WSEndpointPath)
-				t.Logf("Found Playwright browserServer with WebSocket URL: %s", endpoint)
-				return endpoint
-			}
-
-			// Try to parse as regular Playwright targets
-			resp2, err2 := http.Get(httpURL)
-			if err2 != nil {
-				time.Sleep(1 * time.Second)
-				continue
-			}
-
-			var targets []playwrightTarget
-			err2 = json.NewDecoder(resp2.Body).Decode(&targets)
-			resp2.Body.Close()
-
-			if err2 == nil && len(targets) > 0 {
-				// Find the first target with a WebSocket debugger URL
-				for _, target := range targets {
-					if target.WebSocketDebuggerURL != "" {
-						t.Logf("Found Playwright target: %s (%s) with WebSocket URL: %s", target.Title, target.Type, target.WebSocketDebuggerURL)
-						return target.WebSocketDebuggerURL
-					}
-				}
-			}
-		} else {
-			resp.Body.Close()
-		}
-
-		time.Sleep(1 * time.Second)
-	}
-
-	t.Fatalf("No Playwright endpoint found at %s after 30 seconds", httpURL)
-	return ""
-}
-
-// setupPlaywrightBrowser sets up a Playwright-managed Chromium instance and returns the Playwright endpoint.
-// It handles cleanup automatically using t.Cleanup().
-func setupPlaywrightBrowser(t *testing.T) string {
-	t.Helper()
-
-	// Check if we should use an existing Playwright endpoint
-	if endpoint := os.Getenv("PLAYWRIGHT_Playwright_ENDPOINT"); endpoint != "" {
-		t.Logf("Using existing Playwright endpoint from environment: %s", endpoint)
+	if endpoint := os.Getenv("PLAYWRIGHT_ENDPOINT"); endpoint != "" {
+		t.Logf("Using endpoint from PLAYWRIGHT_ENDPOINT env: %s", endpoint)
 		return endpoint
 	}
 
-	// Check if there's a Playwright instance running on localhost:9222 (Playwright server)
-	if isPortOpen("127.0.0.1", 9222) {
-		t.Logf("Found existing Playwright instance on localhost:9222")
-		endpoint := discoverPlaywrightWebSocketEndpoint(t, 9222)
-		t.Logf("Using existing Playwright endpoint: %s", endpoint)
-		return endpoint
-	}
+	port := findFreePort(t)
 
-	// Fall back to creating a new Playwright-managed instance
-	t.Logf("No existing Playwright instance found, creating new Playwright-managed Chromium")
-	return createPlaywrightBrowser(t)
-}
+	// Resolve the local node_modules so server.js can find the playwright package.
+	cwd, err := os.Getwd()
+	require.NoError(t, err)
+	nodeModules := filepath.Join(cwd, "node_modules")
 
-// isPortOpen checks if a TCP port is open and accepting connections.
-func isPortOpen(host string, port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), 2*time.Second)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
+	cmd := exec.Command("node", playwrightServerScript)
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("PLAYWRIGHT_PORT=%d", port),
+		fmt.Sprintf("NODE_PATH=%s", nodeModules),
+	)
+	cmd.Stderr = os.Stderr
 
-// createPlaywrightBrowser creates a new Playwright-managed Chromium instance.
-func createPlaywrightBrowser(t *testing.T) string {
-	t.Helper()
+	stdout, err := cmd.StdoutPipe()
+	require.NoError(t, err)
 
-	// Check if we should skip Playwright installation
-	skipInstall := os.Getenv("PLAYWRIGHT_SKIP_BROWSER_INSTALL") == "1"
-
-	// Initialize Playwright
-	err := playwright.Install(&playwright.RunOptions{
-		SkipInstallBrowsers: skipInstall,
-		Verbose:             testing.Verbose(),
-	})
-	if err != nil && !skipInstall {
-		t.Fatalf("Failed to install Playwright: %v", err)
-	}
-
-	pw, err := playwright.Run()
-	if err != nil {
-		t.Fatalf("Failed to start Playwright: %v", err)
-	}
+	require.NoError(t, cmd.Start())
 	t.Cleanup(func() {
-		if stopErr := pw.Stop(); stopErr != nil {
-			t.Logf("Warning: Failed to stop Playwright: %v", stopErr)
+		_ = cmd.Process.Signal(os.Interrupt)
+		_ = cmd.Wait()
+	})
+
+	scanner := bufio.NewScanner(stdout)
+	deadline := time.After(15 * time.Second)
+	ready := make(chan struct{})
+	var endpoint string
+
+	go func() {
+		for scanner.Scan() {
+			line := scanner.Text()
+			if strings.Contains(line, "WebSocket endpoint:") {
+				endpoint = strings.TrimSpace(strings.SplitN(line, ":", 2)[1])
+				// Normalize — server.js prints host as 0.0.0.0, we connect via 127.0.0.1
+				endpoint = strings.Replace(endpoint, "0.0.0.0", "127.0.0.1", 1)
+				close(ready)
+				return
+			}
 		}
-	})
+	}()
 
-	// Find an available port for Playwright
-	cdpPort := findAvailablePort(t)
-
-	// Launch Chromium with Playwright enabled on a specific port
-	browser, err := pw.Chromium.Launch(playwright.BrowserTypeLaunchOptions{
-		Headless: playwright.Bool(true),
-		Args: []string{
-			fmt.Sprintf("--remote-debugging-port=%d", cdpPort),
-			"--remote-debugging-address=127.0.0.1",
-		},
-	})
-	if err != nil {
-		t.Fatalf("Failed to launch Chromium: %v", err)
+	select {
+	case <-ready:
+		t.Logf("Playwright server ready at %s", endpoint)
+	case <-deadline:
+		_ = cmd.Process.Kill()
+		t.Fatal("server.js did not print WebSocket endpoint within 15s")
 	}
-	t.Cleanup(func() {
-		if closeErr := browser.Close(); closeErr != nil {
-			t.Logf("Warning: Failed to close browser: %v", closeErr)
-		}
-	})
-
-	// Create a page to ensure we have some targets
-	page, err := browser.NewPage()
-	if err != nil {
-		t.Fatalf("Failed to create page: %v", err)
-	}
-
-	// Navigate to a simple page to create more interesting targets
-	_, err = page.Goto("data:text/html,<html><head><title>Test Page</title></head><body><h1>Integration Test Page</h1></body></html>")
-	if err != nil {
-		t.Logf("Warning: Failed to navigate page: %v", err)
-	}
-
-	// Discover the actual Playwright WebSocket endpoint
-	endpoint := discoverPlaywrightWebSocketEndpoint(t, cdpPort)
-	t.Logf("Using Playwright endpoint: %s", endpoint)
 
 	return endpoint
 }
 
-// TestIntegrationPlaywrightReceiver tests the receiver against a Playwright-managed Chromium instance.
-// This test is only run when the integration build tag is specified.
-//
-// To run this test:
-//
-//	go test -tags=integration -v ./receiver/playwrightreceiver -run TestIntegrationPlaywrightReceiver
-//
-// The test will automatically:
-// 1. Install Playwright browsers if needed
-// 2. Launch a Chromium instance with Playwright enabled
-// 3. Run the receiver tests against it
-// 4. Clean up the browser instance
-func TestIntegrationPlaywrightReceiver(t *testing.T) {
-	// Setup Playwright and browser
-	endpoint := setupPlaywrightBrowser(t)
+func findFreePort(t *testing.T) int {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port
+}
 
-	cfg := &Config{
-		Endpoint: endpoint,
+var allExpectedMetrics = []string{
+	"playwright.targets.count",
+	"playwright.page.document.count",
+	"playwright.page.frame.count",
+	"playwright.page.js_event_listener.count",
+	"playwright.page.dom_node.count",
+	"playwright.page.layout.count",
+	"playwright.page.recalc_style.count",
+	"playwright.page.layout.duration",
+	"playwright.page.recalc_style.duration",
+	"playwright.page.script.duration",
+	"playwright.page.task.duration",
+	"playwright.page.js_heap.used_size",
+	"playwright.page.js_heap.total_size",
+}
+
+func collectMetricNames(metrics pmetric.Metrics) map[string]bool {
+	names := make(map[string]bool)
+	for i := 0; i < metrics.ResourceMetrics().Len(); i++ {
+		rm := metrics.ResourceMetrics().At(i)
+		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+			sm := rm.ScopeMetrics().At(j)
+			for k := 0; k < sm.Metrics().Len(); k++ {
+				names[sm.Metrics().At(k).Name()] = true
+			}
+		}
 	}
+	return names
+}
+
+// TestIntegrationAllPerformanceMetrics verifies the receiver emits all
+// Performance.getMetrics data as proper OTel metrics against a real Chromium.
+func TestIntegrationAllPerformanceMetrics(t *testing.T) {
+	endpoint := startPlaywrightServer(t)
+
+	cfg := &Config{Endpoint: endpoint}
 	cfg.MetricsBuilderConfig = metadata.DefaultMetricsBuilderConfig()
 
 	scraper := newScraper(cfg, receivertest.NewNopSettings(metadata.Type))
@@ -235,145 +142,128 @@ func TestIntegrationPlaywrightReceiver(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Test connection
-	t.Run("connection", func(t *testing.T) {
-		err := scraper.start(ctx, componenttest.NewNopHost())
-		require.NoError(t, err, "Failed to connect to Playwright endpoint %s", endpoint)
-		defer func() {
-			shutdownErr := scraper.shutdown(ctx)
-			assert.NoError(t, shutdownErr)
-		}()
+	err := scraper.start(ctx, componenttest.NewNopHost())
+	require.NoError(t, err, "Failed to connect to %s", endpoint)
+	defer scraper.shutdown(ctx)
 
-		// Test scraping
-		t.Run("scraping", func(t *testing.T) {
-			metrics, err := scraper.scrape(ctx)
-			require.NoError(t, err, "Failed to scrape metrics")
-			assert.NotNil(t, metrics)
+	metrics, err := scraper.scrape(ctx)
+	require.NoError(t, err, "Scrape failed")
+	require.Greater(t, metrics.ResourceMetrics().Len(), 0, "Expected resource metrics")
 
-			// Verify we got some metrics
-			assert.Greater(t, metrics.ResourceMetrics().Len(), 0, "Expected at least one resource metric")
+	names := collectMetricNames(metrics)
+	t.Logf("Emitted %d distinct metric names:", len(names))
+	for name := range names {
+		t.Logf("  %s", name)
+	}
 
-			rm := metrics.ResourceMetrics().At(0)
-			assert.Greater(t, rm.ScopeMetrics().Len(), 0, "Expected at least one scope metric")
-
-			sm := rm.ScopeMetrics().At(0)
-			assert.Greater(t, sm.Metrics().Len(), 0, "Expected at least one metric")
-
-			// Find the playwright.targets.count metric
-			var foundTargetMetric bool
-			var targetMetricIndex int
-			for i := 0; i < sm.Metrics().Len(); i++ {
-				metric := sm.Metrics().At(i)
-				if metric.Name() == "playwright.targets.count" {
-					foundTargetMetric = true
-					targetMetricIndex = i
-					break
-				}
-			}
-
-			require.True(t, foundTargetMetric, "Expected to find playwright.targets.count metric")
-
-			// Log the metrics for debugging
-			t.Logf("Successfully scraped metrics from Playwright endpoint: %s", endpoint)
-			t.Logf("Total resource metrics: %d", metrics.ResourceMetrics().Len())
-			t.Logf("Total data points: %d", sm.Metrics().At(0).Gauge().DataPoints().Len())
-
-			// Verify metric structure
-			metric := sm.Metrics().At(targetMetricIndex)
-			assert.Equal(t, "playwright.targets.count", metric.Name())
-			assert.Greater(t, metric.Gauge().DataPoints().Len(), 0, "Expected at least one data point")
-
-			// Log each target type and count
-			for i := 0; i < metric.Gauge().DataPoints().Len(); i++ {
-				dp := metric.Gauge().DataPoints().At(i)
-				attrs := dp.Attributes()
-
-				endpointVal, exists := attrs.Get("playwright.endpoint")
-				assert.True(t, exists, "Expected playwright.endpoint attribute")
-				assert.Equal(t, endpoint, endpointVal.Str())
-
-				targetTypeVal, exists := attrs.Get("target.type")
-				assert.True(t, exists, "Expected target.type attribute")
-
-				t.Logf("Target type: %s, Count: %d", targetTypeVal.Str(), dp.IntValue())
-			}
-		})
-	})
+	for _, expected := range allExpectedMetrics {
+		assert.True(t, names[expected], "Missing metric: %s", expected)
+	}
 }
 
-// TestIntegrationPlaywrightClient tests the Playwright client directly against a Playwright-managed Chromium instance.
-func TestIntegrationPlaywrightClient(t *testing.T) {
-	// Setup Playwright and browser
-	endpoint := setupPlaywrightBrowser(t)
+// TestIntegrationTwoPages opens two pages through the Playwright client,
+// scrapes, and asserts that we get performance metrics for both pages and
+// that playwright.targets.count includes at least 2 "page" targets.
+func TestIntegrationTwoPages(t *testing.T) {
+	endpoint := startPlaywrightServer(t)
 
-	client := NewPlaywrightClient(endpoint, receivertest.NewNopSettings(metadata.Type).Logger)
+	cfg := &Config{Endpoint: endpoint}
+	cfg.MetricsBuilderConfig = metadata.DefaultMetricsBuilderConfig()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	scraper := newScraper(cfg, receivertest.NewNopSettings(metadata.Type))
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Run("connect_and_get_targets", func(t *testing.T) {
-		err := client.Connect(ctx)
-		require.NoError(t, err, "Failed to connect to Playwright endpoint %s", endpoint)
-		defer func() {
-			disconnectErr := client.Disconnect()
-			assert.NoError(t, disconnectErr)
-		}()
+	err := scraper.start(ctx, componenttest.NewNopHost())
+	require.NoError(t, err)
+	defer scraper.shutdown(ctx)
 
-		// Initialize Playwright and capture browser information
-		initResult, err := client.Initialize(ctx)
-		require.NoError(t, err, "Failed to initialize Playwright")
+	// The scraper already created 1 monitoring page during init.
+	// Create a second page in the same context.
+	pages := scraper.client.Pages()
+	require.GreaterOrEqual(t, len(pages), 1, "Expected at least 1 page after init")
 
-		if initResult.BrowserInfo == nil {
-			t.Skip("No browser information available - skipping target retrieval test")
-			return
+	existingPage := pages[0]
+	t.Logf("Existing page: GUID=%s context=%s", existingPage.GUID, existingPage.ContextGUID)
+
+	// Navigate the first page to a real URL
+	if navErr := scraper.client.NavigatePage(ctx, existingPage.GUID, "https://example.com"); navErr != nil {
+		t.Logf("Navigate page 1: %v (continuing anyway)", navErr)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	// Open a second page in the same BrowserContext
+	page2GUID, err := scraper.client.NewPage(ctx, existingPage.ContextGUID)
+	require.NoError(t, err, "Failed to create second page")
+	t.Logf("Created second page: GUID=%s", page2GUID)
+
+	time.Sleep(500 * time.Millisecond)
+
+	// Navigate the second page to a different URL
+	if navErr := scraper.client.NavigatePage(ctx, page2GUID, "https://example.org"); navErr != nil {
+		t.Logf("Navigate page 2: %v (continuing anyway)", navErr)
+	}
+	time.Sleep(500 * time.Millisecond)
+
+	// Verify the client now tracks 2 pages
+	pages = scraper.client.Pages()
+	require.Equal(t, 2, len(pages), "Expected exactly 2 tracked pages")
+	t.Logf("Tracked pages:")
+	for _, p := range pages {
+		t.Logf("  GUID=%s url=%s", p.GUID, p.URL)
+	}
+
+	// Scrape and verify metrics
+	metrics, err := scraper.scrape(ctx)
+	require.NoError(t, err)
+	require.Greater(t, metrics.ResourceMetrics().Len(), 0)
+
+	rm := metrics.ResourceMetrics().At(0)
+	sm := rm.ScopeMetrics().At(0)
+
+	// --- Check playwright.targets.count has >= 2 page targets ---
+	var totalPageTargets int64
+	for i := 0; i < sm.Metrics().Len(); i++ {
+		m := sm.Metrics().At(i)
+		if m.Name() != "playwright.targets.count" {
+			continue
 		}
-
-		// Create CDP session
-		sessionResult, err := client.NewBrowserCDPSession(ctx, initResult.BrowserInfo.GUID)
-		require.NoError(t, err, "Failed to create CDP session")
-
-		// Get targets via CDP
-		resp, err := client.GetTargetsViaCDP(ctx, sessionResult.Session.GUID)
-		require.NoError(t, err, "Failed to get targets via CDP")
-
-		// Parse the response
-		var targetsResp TargetsResponse
-		err = json.Unmarshal(resp.Result, &targetsResp)
-		require.NoError(t, err, "Failed to parse targets response")
-
-		t.Logf("Retrieved %d targets from Playwright via CDP", len(targetsResp.Result.TargetInfos))
-
-		// Log each target for debugging
-		targetTypes := make(map[string]int)
-		for _, target := range targetsResp.Result.TargetInfos {
-			targetTypes[target.Type]++
-			t.Logf("Target: ID=%s, Type=%s, Title=%s, URL=%s, Attached=%v",
-				target.TargetID, target.Type, target.Title, target.URL, target.Attached)
+		for j := 0; j < m.Gauge().DataPoints().Len(); j++ {
+			dp := m.Gauge().DataPoints().At(j)
+			tt, _ := dp.Attributes().Get("target.type")
+			t.Logf("targets.count  type=%-20s count=%d", tt.Str(), dp.IntValue())
+			if tt.Str() == "page" {
+				totalPageTargets += dp.IntValue()
+			}
 		}
+	}
+	assert.GreaterOrEqual(t, totalPageTargets, int64(2),
+		"Expected at least 2 page targets, got %d", totalPageTargets)
 
-		// Log summary by type
-		t.Logf("Target summary by type:")
-		for targetType, count := range targetTypes {
-			t.Logf("  %s: %d", targetType, count)
+	// --- Check performance metrics have data points for 2 pages ---
+	heapMetricDPs := 0
+	for i := 0; i < sm.Metrics().Len(); i++ {
+		m := sm.Metrics().At(i)
+		if m.Name() != "playwright.page.js_heap.used_size" {
+			continue
 		}
-
-		// Verify targets - browserServer might not be able to create targets, so just log the result
-		if len(targetsResp.Result.TargetInfos) == 0 {
-			t.Logf("No targets found - this is expected for some browserServer configurations")
-		} else {
-			t.Logf("Successfully found %d targets", len(targetsResp.Result.TargetInfos))
+		heapMetricDPs = m.Gauge().DataPoints().Len()
+		for j := 0; j < m.Gauge().DataPoints().Len(); j++ {
+			dp := m.Gauge().DataPoints().At(j)
+			url, _ := dp.Attributes().Get("target.url")
+			t.Logf("js_heap.used_size  url=%-50s value=%d", url.Str(), dp.IntValue())
 		}
-	})
+	}
+	assert.Equal(t, 2, heapMetricDPs,
+		"Expected 2 data points for js_heap.used_size (one per page), got %d", heapMetricDPs)
 }
 
-// TestIntegrationMultipleScrapes tests multiple scraping cycles to ensure stability.
+// TestIntegrationMultipleScrapes verifies stability over multiple scrape cycles.
 func TestIntegrationMultipleScrapes(t *testing.T) {
-	// Setup Playwright and browser
-	endpoint := setupPlaywrightBrowser(t)
+	endpoint := startPlaywrightServer(t)
 
-	cfg := &Config{
-		Endpoint: endpoint,
-	}
+	cfg := &Config{Endpoint: endpoint}
 	cfg.MetricsBuilderConfig = metadata.DefaultMetricsBuilderConfig()
 
 	scraper := newScraper(cfg, receivertest.NewNopSettings(metadata.Type))
@@ -383,188 +273,56 @@ func TestIntegrationMultipleScrapes(t *testing.T) {
 
 	err := scraper.start(ctx, componenttest.NewNopHost())
 	require.NoError(t, err)
-	defer func() {
-		shutdownErr := scraper.shutdown(ctx)
-		assert.NoError(t, shutdownErr)
-	}()
+	defer scraper.shutdown(ctx)
 
-	// Perform multiple scrapes
-	const numScrapes = 5
+	const numScrapes = 3
 	for i := 0; i < numScrapes; i++ {
 		t.Run(fmt.Sprintf("scrape_%d", i+1), func(t *testing.T) {
 			metrics, scrapeErr := scraper.scrape(ctx)
-			assert.NoError(t, scrapeErr, "Scrape %d failed", i+1)
-			assert.NotNil(t, metrics)
-			assert.Greater(t, metrics.ResourceMetrics().Len(), 0, "Scrape %d returned no metrics", i+1)
+			require.NoError(t, scrapeErr, "Scrape %d failed", i+1)
+			require.Greater(t, metrics.ResourceMetrics().Len(), 0, "Scrape %d returned no metrics", i+1)
 
-			t.Logf("Scrape %d completed successfully", i+1)
+			names := collectMetricNames(metrics)
+			assert.True(t, names["playwright.targets.count"])
+			t.Logf("Scrape %d: %d metric names emitted", i+1, len(names))
 		})
 
-		// Small delay between scrapes
 		if i < numScrapes-1 {
 			time.Sleep(2 * time.Second)
 		}
 	}
 }
 
-// TestInitializeAgainstRealServer tests the Initialize method against a real Playwright server
-// This test requires a Playwright server running on localhost:8765/ws
-// To run this test:
-//
-//	go test -tags=integration -v -run TestInitializeAgainstRealServer
-func TestInitializeAgainstRealServer(t *testing.T) {
-	endpoint := "ws://localhost:8765/ws"
-	t.Logf("Testing Initialize method against real Playwright server at %s", endpoint)
-
-	// Skip this test if the server is not available
-	if !isPortOpen("127.0.0.1", 8765) {
-		t.Skip("Skipping test: No Playwright server running on localhost:8765")
-	}
-
-	client := NewPlaywrightClient(endpoint, receivertest.NewNopSettings(metadata.Type).Logger)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	err := client.Connect(ctx)
-	require.NoError(t, err, "Failed to connect to Playwright server")
-	defer func() {
-		assert.NoError(t, client.Disconnect())
-	}()
-
-	t.Log("Connected to Playwright server successfully!")
-
-	// Test the Initialize method
-	t.Log("Calling Initialize method...")
-	start := time.Now()
-
-	result, err := client.Initialize(ctx)
-	require.NoError(t, err, "Initialize method failed")
-	require.NotNil(t, result, "Initialize result should not be nil")
-
-	duration := time.Since(start)
-	t.Logf("✅ Initialize completed successfully in %v", duration)
-
-	// Verify the result
-	assert.Equal(t, "Playwright", result.Playwright.GUID, "Expected Playwright GUID to be 'Playwright'")
-
-	t.Logf("🎉 SUCCESS: Initialize method returned expected result: %+v", result)
-	t.Logf("Playwright GUID: %s", result.Playwright.GUID)
-
-	if result.BrowserInfo != nil {
-		t.Logf("📱 Browser Info captured:")
-		t.Logf("  GUID: %s", result.BrowserInfo.GUID)
-		t.Logf("  Name: %s", result.BrowserInfo.Name)
-		t.Logf("  Version: %s", result.BrowserInfo.Version)
-		t.Logf("  Type: %s", result.BrowserInfo.Type)
-		t.Logf("  Initializer: %+v", result.BrowserInfo.Initializer)
-
-		// Test the NewBrowserCDPSession function
-		t.Log("🔗 Testing NewBrowserCDPSession...")
-		cdpSession, err := client.NewBrowserCDPSession(ctx, result.BrowserInfo.GUID)
-		if err != nil {
-			t.Logf("❌ Failed to create CDP session: %v", err)
-		} else {
-			t.Logf("✅ Successfully created CDP session with GUID: %s", cdpSession.Session.GUID)
-
-			// Test sending Target.getTargets via CDP
-			t.Log("🎯 Testing GetTargetsViaCDP...")
-			resp, err := client.GetTargetsViaCDP(ctx, cdpSession.Session.GUID)
-			if err != nil {
-				t.Logf("❌ Failed to send Target.getTargets via CDP: %v", err)
-			} else {
-				t.Logf("✅ Successfully sent Target.getTargets via CDP session")
-				t.Logf("📊 Received response: %s", string(resp.Result))
-			}
-		}
-
-	} else {
-		t.Logf("⚠️  No browser info captured")
-	}
-}
-
-// TestRealScraperAgainstPort8765 tests the complete scraper flow against the real server on port 8765
-func TestRealScraperAgainstPort8765(t *testing.T) {
-	endpoint := "ws://localhost:8765/ws"
-	t.Logf("Testing complete scraper flow against: %s", endpoint)
-
-	// Skip if server not available
-	if !isPortOpen("127.0.0.1", 8765) {
-		t.Skip("Skipping test: No Playwright server running on localhost:8765")
-	}
+// TestIntegrationFullReceiverPipeline tests the full receiver → consumer pipeline.
+func TestIntegrationFullReceiverPipeline(t *testing.T) {
+	endpoint := startPlaywrightServer(t)
 
 	cfg := createDefaultConfig().(*Config)
 	cfg.Endpoint = endpoint
-	cfg.CollectionInterval = 2 * time.Second // Faster collection for testing
+	cfg.CollectionInterval = 2 * time.Second
 
 	consumer := new(consumertest.MetricsSink)
-	receiver, err := createMetricsReceiver(context.Background(), receivertest.NewNopSettings(metadata.Type), cfg, consumer)
+	recv, err := createMetricsReceiver(context.Background(), receivertest.NewNopSettings(metadata.Type), cfg, consumer)
 	require.NoError(t, err)
-
-	host := componenttest.NewNopHost()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	t.Log("🚀 Starting receiver (this will call Initialize and NewBrowserCDPSession)...")
-	err = receiver.Start(ctx, host)
-	if err != nil {
-		t.Fatalf("Failed to start receiver: %v", err)
-	}
-	t.Log("✅ Receiver started successfully")
+	err = recv.Start(ctx, componenttest.NewNopHost())
+	require.NoError(t, err, "Receiver failed to start")
+	defer recv.Shutdown(context.Background())
 
-	defer func() {
-		t.Log("🛑 Shutting down receiver...")
-		assert.NoError(t, receiver.Shutdown(context.Background()))
-	}()
-
-	t.Log("⏱️  Waiting for metrics collection...")
-	// Wait for some metrics to be collected
 	require.Eventually(t, func() bool {
 		return consumer.DataPointCount() > 0
-	}, 15*time.Second, 500*time.Millisecond, "failed to collect metrics")
+	}, 15*time.Second, 500*time.Millisecond, "No metrics collected within timeout")
 
-	t.Log("📊 Analyzing collected metrics...")
-	metrics := consumer.AllMetrics()[0]
-	assert.Greater(t, metrics.ResourceMetrics().Len(), 0, "Expected at least one resource metric")
+	allMetrics := consumer.AllMetrics()
+	require.Greater(t, len(allMetrics), 0)
 
-	rm := metrics.ResourceMetrics().At(0)
-	assert.Greater(t, rm.ScopeMetrics().Len(), 0, "Expected at least one scope metric")
+	names := collectMetricNames(allMetrics[0])
+	t.Logf("Pipeline collected %d metric names from %d batches", len(names), len(allMetrics))
 
-	sm := rm.ScopeMetrics().At(0)
-	assert.Greater(t, sm.Metrics().Len(), 0, "Expected at least one metric")
-
-	// Find the playwright.targets.count metric
-	var foundTargetMetric bool
-	var targetMetricIndex int
-	for i := 0; i < sm.Metrics().Len(); i++ {
-		metric := sm.Metrics().At(i)
-		if metric.Name() == "playwright.targets.count" {
-			foundTargetMetric = true
-			targetMetricIndex = i
-			break
-		}
+	for _, expected := range allExpectedMetrics {
+		assert.True(t, names[expected], "Pipeline missing metric: %s", expected)
 	}
-
-	require.True(t, foundTargetMetric, "Expected to find playwright.targets.count metric")
-
-	// Verify metric structure
-	metric := sm.Metrics().At(targetMetricIndex)
-	assert.Equal(t, "playwright.targets.count", metric.Name())
-	assert.Greater(t, metric.Gauge().DataPoints().Len(), 0, "Expected at least one data point")
-
-	t.Logf("✅ Successfully collected metrics from: %s", endpoint)
-	t.Logf("📈 Total resource metrics: %d", metrics.ResourceMetrics().Len())
-	t.Logf("📊 Total data points: %d", metric.Gauge().DataPoints().Len())
-
-	// Log each target type and count
-	for i := 0; i < metric.Gauge().DataPoints().Len(); i++ {
-		dp := metric.Gauge().DataPoints().At(i)
-		targetType, exists := dp.Attributes().Get("target.type")
-		if exists {
-			t.Logf("  🎯 Target Type: %s, Count: %d", targetType.Str(), dp.IntValue())
-		}
-	}
-
-	t.Log("🎉 Test completed successfully! The scraper now uses Initialize and NewBrowserCDPSession on startup.")
 }

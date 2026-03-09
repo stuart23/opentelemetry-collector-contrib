@@ -61,6 +61,54 @@ func TestMetricsBuilder(t *testing.T) {
 
 			defaultMetricsCount++
 			allMetricsCount++
+			mb.RecordPlaywrightPageDocumentCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageDomNodeCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageFrameCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageJsEventListenerCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageJsHeapTotalSizeDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageJsHeapUsedSizeDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageLayoutCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageLayoutDurationDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageRecalcStyleCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageRecalcStyleDurationDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageScriptDurationDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
+			mb.RecordPlaywrightPageTaskDurationDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val", "target.url-val")
+
+			defaultMetricsCount++
+			allMetricsCount++
 			mb.RecordPlaywrightTargetsCountDataPoint(ts, 1, "playwright.endpoint-val", "target.type-val")
 
 			res := pcommon.NewResource()
@@ -85,6 +133,270 @@ func TestMetricsBuilder(t *testing.T) {
 			validatedMetrics := make(map[string]bool)
 			for i := 0; i < ms.Len(); i++ {
 				switch ms.At(i).Name() {
+				case "playwright.page.document.count":
+					assert.False(t, validatedMetrics["playwright.page.document.count"], "Found a duplicate in the metrics slice: playwright.page.document.count")
+					validatedMetrics["playwright.page.document.count"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Number of documents in the page.", ms.At(i).Description())
+					assert.Equal(t, "{document}", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.dom_node.count":
+					assert.False(t, validatedMetrics["playwright.page.dom_node.count"], "Found a duplicate in the metrics slice: playwright.page.dom_node.count")
+					validatedMetrics["playwright.page.dom_node.count"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Number of DOM nodes in the page.", ms.At(i).Description())
+					assert.Equal(t, "{node}", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.frame.count":
+					assert.False(t, validatedMetrics["playwright.page.frame.count"], "Found a duplicate in the metrics slice: playwright.page.frame.count")
+					validatedMetrics["playwright.page.frame.count"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Number of frames in the page.", ms.At(i).Description())
+					assert.Equal(t, "{frame}", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.js_event_listener.count":
+					assert.False(t, validatedMetrics["playwright.page.js_event_listener.count"], "Found a duplicate in the metrics slice: playwright.page.js_event_listener.count")
+					validatedMetrics["playwright.page.js_event_listener.count"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Number of JavaScript event listeners in the page.", ms.At(i).Description())
+					assert.Equal(t, "{listener}", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.js_heap.total_size":
+					assert.False(t, validatedMetrics["playwright.page.js_heap.total_size"], "Found a duplicate in the metrics slice: playwright.page.js_heap.total_size")
+					validatedMetrics["playwright.page.js_heap.total_size"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Total JavaScript heap size.", ms.At(i).Description())
+					assert.Equal(t, "By", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.js_heap.used_size":
+					assert.False(t, validatedMetrics["playwright.page.js_heap.used_size"], "Found a duplicate in the metrics slice: playwright.page.js_heap.used_size")
+					validatedMetrics["playwright.page.js_heap.used_size"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Gauge().DataPoints().Len())
+					assert.Equal(t, "Used JavaScript heap size.", ms.At(i).Description())
+					assert.Equal(t, "By", ms.At(i).Unit())
+					dp := ms.At(i).Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.layout.count":
+					assert.False(t, validatedMetrics["playwright.page.layout.count"], "Found a duplicate in the metrics slice: playwright.page.layout.count")
+					validatedMetrics["playwright.page.layout.count"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative count of full or partial page layouts.", ms.At(i).Description())
+					assert.Equal(t, "{layout}", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.layout.duration":
+					assert.False(t, validatedMetrics["playwright.page.layout.duration"], "Found a duplicate in the metrics slice: playwright.page.layout.duration")
+					validatedMetrics["playwright.page.layout.duration"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative duration of page layout operations.", ms.At(i).Description())
+					assert.Equal(t, "s", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeDouble, dp.ValueType())
+					assert.InDelta(t, float64(1), dp.DoubleValue(), 0.01)
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.recalc_style.count":
+					assert.False(t, validatedMetrics["playwright.page.recalc_style.count"], "Found a duplicate in the metrics slice: playwright.page.recalc_style.count")
+					validatedMetrics["playwright.page.recalc_style.count"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative count of CSS style recalculations.", ms.At(i).Description())
+					assert.Equal(t, "{recalculation}", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.recalc_style.duration":
+					assert.False(t, validatedMetrics["playwright.page.recalc_style.duration"], "Found a duplicate in the metrics slice: playwright.page.recalc_style.duration")
+					validatedMetrics["playwright.page.recalc_style.duration"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative duration of CSS style recalculations.", ms.At(i).Description())
+					assert.Equal(t, "s", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeDouble, dp.ValueType())
+					assert.InDelta(t, float64(1), dp.DoubleValue(), 0.01)
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.script.duration":
+					assert.False(t, validatedMetrics["playwright.page.script.duration"], "Found a duplicate in the metrics slice: playwright.page.script.duration")
+					validatedMetrics["playwright.page.script.duration"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative duration of JavaScript execution.", ms.At(i).Description())
+					assert.Equal(t, "s", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeDouble, dp.ValueType())
+					assert.InDelta(t, float64(1), dp.DoubleValue(), 0.01)
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
+				case "playwright.page.task.duration":
+					assert.False(t, validatedMetrics["playwright.page.task.duration"], "Found a duplicate in the metrics slice: playwright.page.task.duration")
+					validatedMetrics["playwright.page.task.duration"] = true
+					assert.Equal(t, pmetric.MetricTypeSum, ms.At(i).Type())
+					assert.Equal(t, 1, ms.At(i).Sum().DataPoints().Len())
+					assert.Equal(t, "Cumulative duration of all tasks.", ms.At(i).Description())
+					assert.Equal(t, "s", ms.At(i).Unit())
+					assert.True(t, ms.At(i).Sum().IsMonotonic())
+					assert.Equal(t, pmetric.AggregationTemporalityCumulative, ms.At(i).Sum().AggregationTemporality())
+					dp := ms.At(i).Sum().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeDouble, dp.ValueType())
+					assert.InDelta(t, float64(1), dp.DoubleValue(), 0.01)
+					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
+					assert.True(t, ok)
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.type")
+					assert.True(t, ok)
+					assert.Equal(t, "target.type-val", attrVal.Str())
+					attrVal, ok = dp.Attributes().Get("target.url")
+					assert.True(t, ok)
+					assert.Equal(t, "target.url-val", attrVal.Str())
 				case "playwright.targets.count":
 					assert.False(t, validatedMetrics["playwright.targets.count"], "Found a duplicate in the metrics slice: playwright.targets.count")
 					validatedMetrics["playwright.targets.count"] = true
@@ -99,10 +411,10 @@ func TestMetricsBuilder(t *testing.T) {
 					assert.Equal(t, int64(1), dp.IntValue())
 					attrVal, ok := dp.Attributes().Get("playwright.endpoint")
 					assert.True(t, ok)
-					assert.EqualValues(t, "playwright.endpoint-val", attrVal.Str())
+					assert.Equal(t, "playwright.endpoint-val", attrVal.Str())
 					attrVal, ok = dp.Attributes().Get("target.type")
 					assert.True(t, ok)
-					assert.EqualValues(t, "target.type-val", attrVal.Str())
+					assert.Equal(t, "target.type-val", attrVal.Str())
 				}
 			}
 		})

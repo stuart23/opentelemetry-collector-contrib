@@ -9,6 +9,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
+
+	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 )
 
@@ -25,7 +27,19 @@ func TestMetricsBuilderConfig(t *testing.T) {
 			name: "all_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					PlaywrightTargetsCount: MetricConfig{Enabled: true},
+					PlaywrightPageDocumentCount:        MetricConfig{Enabled: true},
+					PlaywrightPageDomNodeCount:         MetricConfig{Enabled: true},
+					PlaywrightPageFrameCount:           MetricConfig{Enabled: true},
+					PlaywrightPageJsEventListenerCount: MetricConfig{Enabled: true},
+					PlaywrightPageJsHeapTotalSize:      MetricConfig{Enabled: true},
+					PlaywrightPageJsHeapUsedSize:       MetricConfig{Enabled: true},
+					PlaywrightPageLayoutCount:          MetricConfig{Enabled: true},
+					PlaywrightPageLayoutDuration:       MetricConfig{Enabled: true},
+					PlaywrightPageRecalcStyleCount:     MetricConfig{Enabled: true},
+					PlaywrightPageRecalcStyleDuration:  MetricConfig{Enabled: true},
+					PlaywrightPageScriptDuration:       MetricConfig{Enabled: true},
+					PlaywrightPageTaskDuration:         MetricConfig{Enabled: true},
+					PlaywrightTargetsCount:             MetricConfig{Enabled: true},
 				},
 			},
 		},
@@ -33,7 +47,19 @@ func TestMetricsBuilderConfig(t *testing.T) {
 			name: "none_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					PlaywrightTargetsCount: MetricConfig{Enabled: false},
+					PlaywrightPageDocumentCount:        MetricConfig{Enabled: false},
+					PlaywrightPageDomNodeCount:         MetricConfig{Enabled: false},
+					PlaywrightPageFrameCount:           MetricConfig{Enabled: false},
+					PlaywrightPageJsEventListenerCount: MetricConfig{Enabled: false},
+					PlaywrightPageJsHeapTotalSize:      MetricConfig{Enabled: false},
+					PlaywrightPageJsHeapUsedSize:       MetricConfig{Enabled: false},
+					PlaywrightPageLayoutCount:          MetricConfig{Enabled: false},
+					PlaywrightPageLayoutDuration:       MetricConfig{Enabled: false},
+					PlaywrightPageRecalcStyleCount:     MetricConfig{Enabled: false},
+					PlaywrightPageRecalcStyleDuration:  MetricConfig{Enabled: false},
+					PlaywrightPageScriptDuration:       MetricConfig{Enabled: false},
+					PlaywrightPageTaskDuration:         MetricConfig{Enabled: false},
+					PlaywrightTargetsCount:             MetricConfig{Enabled: false},
 				},
 			},
 		},
@@ -53,6 +79,6 @@ func loadMetricsBuilderConfig(t *testing.T, name string) MetricsBuilderConfig {
 	sub, err := cm.Sub(name)
 	require.NoError(t, err)
 	cfg := DefaultMetricsBuilderConfig()
-	require.NoError(t, sub.Unmarshal(&cfg))
+	require.NoError(t, sub.Unmarshal(&cfg, confmap.WithIgnoreUnused()))
 	return cfg
 }
