@@ -1,4 +1,4 @@
-type: playwright
+type: chromium
 
 status:
   class: receiver
@@ -12,8 +12,8 @@ status:
 resource_attributes:
 
 attributes:
-  playwright.endpoint:
-    description: Playwright WebSocket endpoint URL.
+  chromium.endpoint:
+    description: Chrome DevTools Protocol WebSocket endpoint URL.
     type: string
   target.type:
     description: The type of the target (page, background_page, service_worker, browser, etc).
@@ -23,47 +23,47 @@ attributes:
     type: string
 
 metrics:
-  playwright.targets.count:
-    description: Number of active targets reported by Playwright.
+  chromium.targets.count:
+    description: Number of active browser targets.
     enabled: true
     gauge:
       value_type: int
     unit: "{target}"
-    attributes: [ playwright.endpoint, target.type ]
+    attributes: [ chromium.endpoint, target.type ]
 
-  playwright.page.document.count:
+  chromium.page.document.count:
     description: Number of documents in the page.
     enabled: true
     gauge:
       value_type: int
     unit: "{document}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.frame.count:
+  chromium.page.frame.count:
     description: Number of frames in the page.
     enabled: true
     gauge:
       value_type: int
     unit: "{frame}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.js_event_listener.count:
+  chromium.page.js_event_listener.count:
     description: Number of JavaScript event listeners in the page.
     enabled: true
     gauge:
       value_type: int
     unit: "{listener}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.dom_node.count:
+  chromium.page.dom_node.count:
     description: Number of DOM nodes in the page.
     enabled: true
     gauge:
       value_type: int
     unit: "{node}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.layout.count:
+  chromium.page.layout.count:
     description: Cumulative count of full or partial page layouts.
     enabled: true
     sum:
@@ -71,9 +71,9 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: "{layout}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.recalc_style.count:
+  chromium.page.recalc_style.count:
     description: Cumulative count of CSS style recalculations.
     enabled: true
     sum:
@@ -81,9 +81,9 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: "{recalculation}"
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.layout.duration:
+  chromium.page.layout.duration:
     description: Cumulative duration of page layout operations.
     enabled: true
     sum:
@@ -91,9 +91,9 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: s
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.recalc_style.duration:
+  chromium.page.recalc_style.duration:
     description: Cumulative duration of CSS style recalculations.
     enabled: true
     sum:
@@ -101,9 +101,9 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: s
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.script.duration:
+  chromium.page.script.duration:
     description: Cumulative duration of JavaScript execution.
     enabled: true
     sum:
@@ -111,9 +111,9 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: s
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.task.duration:
+  chromium.page.task.duration:
     description: Cumulative duration of all tasks.
     enabled: true
     sum:
@@ -121,23 +121,23 @@ metrics:
       monotonic: true
       aggregation_temporality: cumulative
     unit: s
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.js_heap.used_size:
+  chromium.page.js_heap.used_size:
     description: Used JavaScript heap size.
     enabled: true
     gauge:
       value_type: int
     unit: By
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
-  playwright.page.js_heap.total_size:
+  chromium.page.js_heap.total_size:
     description: Total JavaScript heap size.
     enabled: true
     gauge:
       value_type: int
     unit: By
-    attributes: [ playwright.endpoint, target.type, target.url ]
+    attributes: [ chromium.endpoint, target.type, target.url ]
 
 tests:
   skip_lifecycle: true

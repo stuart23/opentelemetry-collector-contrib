@@ -1,11 +1,11 @@
-module github.com/open-telemetry/opentelemetry-collector-contrib/receiver/playwrightreceiver
+module github.com/open-telemetry/opentelemetry-collector-contrib/receiver/chromiumreceiver
 
 go 1.24.0
 
 require (
+	github.com/chromedp/cdproto v0.0.0-20250803210736-d308e07a266d
+	github.com/chromedp/chromedp v0.14.2
 	github.com/google/go-cmp v0.7.0
-	github.com/gorilla/websocket v1.5.3
-	github.com/playwright-community/playwright-go v0.4702.0
 	github.com/stretchr/testify v1.10.0
 	go.opentelemetry.io/collector/component v1.40.0
 	go.opentelemetry.io/collector/component/componenttest v0.134.0
@@ -23,14 +23,16 @@ require (
 )
 
 require (
+	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
-	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
+	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/go-stack/stack v1.8.1 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
+	github.com/gobwas/httphead v0.1.0 // indirect
+	github.com/gobwas/pool v0.2.1 // indirect
+	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
@@ -42,6 +44,7 @@ require (
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
+	github.com/orisano/pixelmatch v0.0.0-20230914042517-fa304d1dc785 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
 	go.opentelemetry.io/collector/consumer/consumererror v0.134.0 // indirect
@@ -60,7 +63,6 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.37.0 // indirect
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/exp v0.0.0-20240506185415-9bf2ced13842 // indirect
 	golang.org/x/net v0.43.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect

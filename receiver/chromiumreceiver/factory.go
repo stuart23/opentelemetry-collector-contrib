@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package playwrightreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/playwrightreceiver"
+package chromiumreceiver // import "github.com/open-telemetry/opentelemetry-collector-contrib/receiver/chromiumreceiver"
 
 import (
 	"context"
@@ -14,10 +14,10 @@ import (
 	"go.opentelemetry.io/collector/scraper"
 	"go.opentelemetry.io/collector/scraper/scraperhelper"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/playwrightreceiver/internal/metadata"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/chromiumreceiver/internal/metadata"
 )
 
-var errConfigNotPlaywright = errors.New("config was not a Playwright receiver config")
+var errConfigNotChromium = errors.New("config was not a Chromium receiver config")
 
 // NewFactory creates a new receiver factory
 func NewFactory() receiver.Factory {
@@ -41,11 +41,11 @@ func createDefaultConfig() component.Config {
 func createMetricsReceiver(_ context.Context, params receiver.Settings, rConf component.Config, consumer consumer.Metrics) (receiver.Metrics, error) {
 	cfg, ok := rConf.(*Config)
 	if !ok {
-		return nil, errConfigNotPlaywright
+		return nil, errConfigNotChromium
 	}
 
-	playwrightScraper := newScraper(cfg, params)
-	s, err := scraper.NewMetrics(playwrightScraper.scrape, scraper.WithStart(playwrightScraper.start), scraper.WithShutdown(playwrightScraper.shutdown))
+	chromiumScraper := newScraper(cfg, params)
+	s, err := scraper.NewMetrics(chromiumScraper.scrape, scraper.WithStart(chromiumScraper.start), scraper.WithShutdown(chromiumScraper.shutdown))
 	if err != nil {
 		return nil, err
 	}

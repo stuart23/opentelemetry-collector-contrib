@@ -1,7 +1,7 @@
 // Copyright The OpenTelemetry Authors
 // SPDX-License-Identifier: Apache-2.0
 
-package playwrightreceiver
+package chromiumreceiver
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 	"go.opentelemetry.io/collector/consumer/consumertest"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 
-	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/playwrightreceiver/internal/metadata"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/chromiumreceiver/internal/metadata"
 )
 
 func TestCreateDefaultConfig(t *testing.T) {
@@ -23,10 +23,10 @@ func TestCreateDefaultConfig(t *testing.T) {
 	assert.NotNil(t, cfg, "failed to create default config")
 	assert.NoError(t, componenttest.CheckConfigStruct(cfg))
 
-	playwrightCfg, ok := cfg.(*Config)
+	chromiumCfg, ok := cfg.(*Config)
 	require.True(t, ok)
-	assert.Equal(t, "", playwrightCfg.Endpoint)
-	assert.Equal(t, 30*time.Second, playwrightCfg.ControllerConfig.CollectionInterval)
+	assert.Equal(t, "", chromiumCfg.Endpoint)
+	assert.Equal(t, 30*time.Second, chromiumCfg.ControllerConfig.CollectionInterval)
 }
 
 func TestCreateMetricsReceiver(t *testing.T) {
@@ -51,11 +51,11 @@ func TestCreateMetricsReceiverInvalidConfig(t *testing.T) {
 	_, err := factory.CreateMetrics(
 		context.Background(),
 		receivertest.NewNopSettings(metadata.Type),
-		&struct{}{}, // invalid config type
+		&struct{}{},
 		consumertest.NewNop(),
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "config was not a Playwright receiver config")
+	assert.Contains(t, err.Error(), "config was not a Chromium receiver config")
 }
 
 func TestFactoryType(t *testing.T) {

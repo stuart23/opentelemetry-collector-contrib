@@ -1,0 +1,57 @@
+default:
+all_set:
+  metrics:
+    chromium.page.document.count:
+      enabled: true
+    chromium.page.dom_node.count:
+      enabled: true
+    chromium.page.frame.count:
+      enabled: true
+    chromium.page.js_event_listener.count:
+      enabled: true
+    chromium.page.js_heap.total_size:
+      enabled: true
+    chromium.page.js_heap.used_size:
+      enabled: true
+    chromium.page.layout.count:
+      enabled: true
+    chromium.page.layout.duration:
+      enabled: true
+    chromium.page.recalc_style.count:
+      enabled: true
+    chromium.page.recalc_style.duration:
+      enabled: true
+    chromium.page.script.duration:
+      enabled: true
+    chromium.page.task.duration:
+      enabled: true
+    chromium.targets.count:
+      enabled: true
+none_set:
+  metrics:
+    chromium.page.document.count:
+      enabled: false
+    chromium.page.dom_node.count:
+      enabled: false
+    chromium.page.frame.count:
+      enabled: false
+    chromium.page.js_event_listener.count:
+      enabled: false
+    chromium.page.js_heap.total_size:
+      enabled: false
+    chromium.page.js_heap.used_size:
+      enabled: false
+    chromium.page.layout.count:
+      enabled: false
+    chromium.page.layout.duration:
+      enabled: false
+    chromium.page.recalc_style.count:
+      enabled: false
+    chromium.page.recalc_style.duration:
+      enabled: false
+    chromium.page.script.duration:
+      enabled: false
+    chromium.page.task.duration:
+      enabled: false
+    chromium.targets.count:
+      enabled: false
