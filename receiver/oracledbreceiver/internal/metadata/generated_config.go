@@ -3,25 +3,53 @@
 package metadata
 
 import (
+	"fmt"
+	"slices"
+
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/filter"
 )
 
 // MetricConfig provides common config for a particular metric.
 type MetricConfig struct {
-	Enabled bool `mapstructure:"enabled"`
-
-	enabledSetByUser bool
+	Enabled             bool `mapstructure:"enabled"`
+	enabledSetByUser    bool
+	AggregationStrategy string   `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []string `mapstructure:"attributes"`
+	definedAttributes   []string
+	requiredAttributes  []string
 }
 
 func (ms *MetricConfig) Unmarshal(parser *confmap.Conf) error {
 	if parser == nil {
 		return nil
 	}
+
 	err := parser.Unmarshal(ms)
 	if err != nil {
 		return err
 	}
+	if len(ms.definedAttributes) > 0 {
+		for _, val := range ms.EnabledAttributes {
+			if !slices.Contains(ms.definedAttributes, val) {
+				return fmt.Errorf("%v is not defined in metadata.yaml", val)
+			}
+		}
+
+		for _, val := range ms.requiredAttributes {
+			if !slices.Contains(ms.EnabledAttributes, val) {
+				return fmt.Errorf("`attributes` field must contain required attribute: %v", val)
+			}
+		}
+
+		if ms.AggregationStrategy != AggregationStrategySum &&
+			ms.AggregationStrategy != AggregationStrategyAvg &&
+			ms.AggregationStrategy != AggregationStrategyMin &&
+			ms.AggregationStrategy != AggregationStrategyMax {
+			return fmt.Errorf("invalid aggregation strategy set: '%v'", ms.AggregationStrategy)
+		}
+	}
+
 	ms.enabledSetByUser = parser.IsSet("enabled")
 	return nil
 }
@@ -180,13 +208,22 @@ func DefaultMetricsConfig() MetricsConfig {
 			Enabled: true,
 		},
 		OracledbSessionsUsage: MetricConfig{
-			Enabled: true,
+			Enabled: true, AggregationStrategy: AggregationStrategyAvg,
+			requiredAttributes: []string{},
+			definedAttributes:  []string{"session_type", "session_status"},
+			EnabledAttributes:  []string{"session_type", "session_status"},
 		},
 		OracledbTablespaceSizeLimit: MetricConfig{
-			Enabled: true,
+			Enabled: true, AggregationStrategy: AggregationStrategyAvg,
+			requiredAttributes: []string{},
+			definedAttributes:  []string{"tablespace_name"},
+			EnabledAttributes:  []string{"tablespace_name"},
 		},
 		OracledbTablespaceSizeUsage: MetricConfig{
-			Enabled: true,
+			Enabled: true, AggregationStrategy: AggregationStrategyAvg,
+			requiredAttributes: []string{},
+			definedAttributes:  []string{"tablespace_name"},
+			EnabledAttributes:  []string{"tablespace_name"},
 		},
 		OracledbTransactionsLimit: MetricConfig{
 			Enabled: true,
@@ -276,6 +313,7 @@ func (rac *ResourceAttributeConfig) Unmarshal(parser *confmap.Conf) error {
 type ResourceAttributesConfig struct {
 	HostName             ResourceAttributeConfig `mapstructure:"host.name"`
 	OracledbInstanceName ResourceAttributeConfig `mapstructure:"oracledb.instance.name"`
+	ServiceInstanceID    ResourceAttributeConfig `mapstructure:"service.instance.id"`
 }
 
 func DefaultResourceAttributesConfig() ResourceAttributesConfig {
@@ -284,6 +322,9 @@ func DefaultResourceAttributesConfig() ResourceAttributesConfig {
 			Enabled: true,
 		},
 		OracledbInstanceName: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		ServiceInstanceID: ResourceAttributeConfig{
 			Enabled: true,
 		},
 	}

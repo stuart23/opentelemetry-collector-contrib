@@ -3,61 +3,102 @@
 package metadata
 
 import (
+	"fmt"
+	"slices"
+
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/filter"
 )
 
 // MetricConfig provides common config for a particular metric.
 type MetricConfig struct {
-	Enabled bool `mapstructure:"enabled"`
-
-	enabledSetByUser bool
+	Enabled             bool `mapstructure:"enabled"`
+	enabledSetByUser    bool
+	AggregationStrategy string   `mapstructure:"aggregation_strategy"`
+	EnabledAttributes   []string `mapstructure:"attributes"`
+	definedAttributes   []string
+	requiredAttributes  []string
 }
 
 func (ms *MetricConfig) Unmarshal(parser *confmap.Conf) error {
 	if parser == nil {
 		return nil
 	}
+
 	err := parser.Unmarshal(ms)
 	if err != nil {
 		return err
 	}
+	if len(ms.definedAttributes) > 0 {
+		for _, val := range ms.EnabledAttributes {
+			if !slices.Contains(ms.definedAttributes, val) {
+				return fmt.Errorf("%v is not defined in metadata.yaml", val)
+			}
+		}
+
+		for _, val := range ms.requiredAttributes {
+			if !slices.Contains(ms.EnabledAttributes, val) {
+				return fmt.Errorf("`attributes` field must contain required attribute: %v", val)
+			}
+		}
+
+		if ms.AggregationStrategy != AggregationStrategySum &&
+			ms.AggregationStrategy != AggregationStrategyAvg &&
+			ms.AggregationStrategy != AggregationStrategyMin &&
+			ms.AggregationStrategy != AggregationStrategyMax {
+			return fmt.Errorf("invalid aggregation strategy set: '%v'", ms.AggregationStrategy)
+		}
+	}
+
 	ms.enabledSetByUser = parser.IsSet("enabled")
 	return nil
 }
 
 // MetricsConfig provides config for haproxy metrics.
 type MetricsConfig struct {
-	HaproxyBytesInput           MetricConfig `mapstructure:"haproxy.bytes.input"`
-	HaproxyBytesOutput          MetricConfig `mapstructure:"haproxy.bytes.output"`
-	HaproxyClientsCanceled      MetricConfig `mapstructure:"haproxy.clients.canceled"`
-	HaproxyCompressionBypass    MetricConfig `mapstructure:"haproxy.compression.bypass"`
-	HaproxyCompressionCount     MetricConfig `mapstructure:"haproxy.compression.count"`
-	HaproxyCompressionInput     MetricConfig `mapstructure:"haproxy.compression.input"`
-	HaproxyCompressionOutput    MetricConfig `mapstructure:"haproxy.compression.output"`
-	HaproxyConnectionsErrors    MetricConfig `mapstructure:"haproxy.connections.errors"`
-	HaproxyConnectionsRate      MetricConfig `mapstructure:"haproxy.connections.rate"`
-	HaproxyConnectionsRetries   MetricConfig `mapstructure:"haproxy.connections.retries"`
-	HaproxyConnectionsTotal     MetricConfig `mapstructure:"haproxy.connections.total"`
-	HaproxyDowntime             MetricConfig `mapstructure:"haproxy.downtime"`
-	HaproxyFailedChecks         MetricConfig `mapstructure:"haproxy.failed_checks"`
-	HaproxyRequestsDenied       MetricConfig `mapstructure:"haproxy.requests.denied"`
-	HaproxyRequestsErrors       MetricConfig `mapstructure:"haproxy.requests.errors"`
-	HaproxyRequestsQueued       MetricConfig `mapstructure:"haproxy.requests.queued"`
-	HaproxyRequestsRate         MetricConfig `mapstructure:"haproxy.requests.rate"`
-	HaproxyRequestsRedispatched MetricConfig `mapstructure:"haproxy.requests.redispatched"`
-	HaproxyRequestsTotal        MetricConfig `mapstructure:"haproxy.requests.total"`
-	HaproxyResponsesDenied      MetricConfig `mapstructure:"haproxy.responses.denied"`
-	HaproxyResponsesErrors      MetricConfig `mapstructure:"haproxy.responses.errors"`
-	HaproxyServerSelectedTotal  MetricConfig `mapstructure:"haproxy.server_selected.total"`
-	HaproxySessionsAverage      MetricConfig `mapstructure:"haproxy.sessions.average"`
-	HaproxySessionsCount        MetricConfig `mapstructure:"haproxy.sessions.count"`
-	HaproxySessionsRate         MetricConfig `mapstructure:"haproxy.sessions.rate"`
-	HaproxySessionsTotal        MetricConfig `mapstructure:"haproxy.sessions.total"`
+	HaproxyActive                 MetricConfig `mapstructure:"haproxy.active"`
+	HaproxyBackup                 MetricConfig `mapstructure:"haproxy.backup"`
+	HaproxyBytesInput             MetricConfig `mapstructure:"haproxy.bytes.input"`
+	HaproxyBytesOutput            MetricConfig `mapstructure:"haproxy.bytes.output"`
+	HaproxyClientsCanceled        MetricConfig `mapstructure:"haproxy.clients.canceled"`
+	HaproxyCompressionBypass      MetricConfig `mapstructure:"haproxy.compression.bypass"`
+	HaproxyCompressionCount       MetricConfig `mapstructure:"haproxy.compression.count"`
+	HaproxyCompressionInput       MetricConfig `mapstructure:"haproxy.compression.input"`
+	HaproxyCompressionOutput      MetricConfig `mapstructure:"haproxy.compression.output"`
+	HaproxyConnectionsAverageTime MetricConfig `mapstructure:"haproxy.connections.average_time"`
+	HaproxyConnectionsErrors      MetricConfig `mapstructure:"haproxy.connections.errors"`
+	HaproxyConnectionsRate        MetricConfig `mapstructure:"haproxy.connections.rate"`
+	HaproxyConnectionsRetries     MetricConfig `mapstructure:"haproxy.connections.retries"`
+	HaproxyConnectionsTotal       MetricConfig `mapstructure:"haproxy.connections.total"`
+	HaproxyDowntime               MetricConfig `mapstructure:"haproxy.downtime"`
+	HaproxyFailedChecks           MetricConfig `mapstructure:"haproxy.failed_checks"`
+	HaproxyRequestsAverageTime    MetricConfig `mapstructure:"haproxy.requests.average_time"`
+	HaproxyRequestsDenied         MetricConfig `mapstructure:"haproxy.requests.denied"`
+	HaproxyRequestsErrors         MetricConfig `mapstructure:"haproxy.requests.errors"`
+	HaproxyRequestsQueued         MetricConfig `mapstructure:"haproxy.requests.queued"`
+	HaproxyRequestsRate           MetricConfig `mapstructure:"haproxy.requests.rate"`
+	HaproxyRequestsRedispatched   MetricConfig `mapstructure:"haproxy.requests.redispatched"`
+	HaproxyRequestsTotal          MetricConfig `mapstructure:"haproxy.requests.total"`
+	HaproxyResponsesAverageTime   MetricConfig `mapstructure:"haproxy.responses.average_time"`
+	HaproxyResponsesDenied        MetricConfig `mapstructure:"haproxy.responses.denied"`
+	HaproxyResponsesErrors        MetricConfig `mapstructure:"haproxy.responses.errors"`
+	HaproxyServerSelectedTotal    MetricConfig `mapstructure:"haproxy.server_selected.total"`
+	HaproxySessionsAverage        MetricConfig `mapstructure:"haproxy.sessions.average"`
+	HaproxySessionsCount          MetricConfig `mapstructure:"haproxy.sessions.count"`
+	HaproxySessionsLimit          MetricConfig `mapstructure:"haproxy.sessions.limit"`
+	HaproxySessionsRate           MetricConfig `mapstructure:"haproxy.sessions.rate"`
+	HaproxySessionsTotal          MetricConfig `mapstructure:"haproxy.sessions.total"`
+	HaproxyWeight                 MetricConfig `mapstructure:"haproxy.weight"`
 }
 
 func DefaultMetricsConfig() MetricsConfig {
 	return MetricsConfig{
+		HaproxyActive: MetricConfig{
+			Enabled: false,
+		},
+		HaproxyBackup: MetricConfig{
+			Enabled: false,
+		},
 		HaproxyBytesInput: MetricConfig{
 			Enabled: true,
 		},
@@ -79,6 +120,9 @@ func DefaultMetricsConfig() MetricsConfig {
 		HaproxyCompressionOutput: MetricConfig{
 			Enabled: false,
 		},
+		HaproxyConnectionsAverageTime: MetricConfig{
+			Enabled: false,
+		},
 		HaproxyConnectionsErrors: MetricConfig{
 			Enabled: true,
 		},
@@ -97,6 +141,9 @@ func DefaultMetricsConfig() MetricsConfig {
 		HaproxyFailedChecks: MetricConfig{
 			Enabled: false,
 		},
+		HaproxyRequestsAverageTime: MetricConfig{
+			Enabled: false,
+		},
 		HaproxyRequestsDenied: MetricConfig{
 			Enabled: true,
 		},
@@ -113,7 +160,13 @@ func DefaultMetricsConfig() MetricsConfig {
 			Enabled: true,
 		},
 		HaproxyRequestsTotal: MetricConfig{
-			Enabled: true,
+			Enabled: true, AggregationStrategy: AggregationStrategySum,
+			requiredAttributes: []string{},
+			definedAttributes:  []string{"status_code"},
+			EnabledAttributes:  []string{"status_code"},
+		},
+		HaproxyResponsesAverageTime: MetricConfig{
+			Enabled: false,
 		},
 		HaproxyResponsesDenied: MetricConfig{
 			Enabled: true,
@@ -130,10 +183,16 @@ func DefaultMetricsConfig() MetricsConfig {
 		HaproxySessionsCount: MetricConfig{
 			Enabled: true,
 		},
+		HaproxySessionsLimit: MetricConfig{
+			Enabled: false,
+		},
 		HaproxySessionsRate: MetricConfig{
 			Enabled: true,
 		},
 		HaproxySessionsTotal: MetricConfig{
+			Enabled: false,
+		},
+		HaproxyWeight: MetricConfig{
 			Enabled: false,
 		},
 	}

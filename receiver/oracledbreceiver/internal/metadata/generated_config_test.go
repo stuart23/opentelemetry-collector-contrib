@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
-
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 )
@@ -62,17 +61,30 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					OracledbProcessesUsage:                        MetricConfig{Enabled: true},
 					OracledbQueriesParallelized:                   MetricConfig{Enabled: true},
 					OracledbSessionsLimit:                         MetricConfig{Enabled: true},
-					OracledbSessionsUsage:                         MetricConfig{Enabled: true},
-					OracledbTablespaceSizeLimit:                   MetricConfig{Enabled: true},
-					OracledbTablespaceSizeUsage:                   MetricConfig{Enabled: true},
-					OracledbTransactionsLimit:                     MetricConfig{Enabled: true},
-					OracledbTransactionsUsage:                     MetricConfig{Enabled: true},
-					OracledbUserCommits:                           MetricConfig{Enabled: true},
-					OracledbUserRollbacks:                         MetricConfig{Enabled: true},
+					OracledbSessionsUsage: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"session_type", "session_status"},
+					},
+					OracledbTablespaceSizeLimit: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"tablespace_name"},
+					},
+					OracledbTablespaceSizeUsage: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"tablespace_name"},
+					},
+					OracledbTransactionsLimit: MetricConfig{Enabled: true},
+					OracledbTransactionsUsage: MetricConfig{Enabled: true},
+					OracledbUserCommits:       MetricConfig{Enabled: true},
+					OracledbUserRollbacks:     MetricConfig{Enabled: true},
 				},
 				ResourceAttributes: ResourceAttributesConfig{
 					HostName:             ResourceAttributeConfig{Enabled: true},
 					OracledbInstanceName: ResourceAttributeConfig{Enabled: true},
+					ServiceInstanceID:    ResourceAttributeConfig{Enabled: true},
 				},
 			},
 		},
@@ -115,17 +127,30 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					OracledbProcessesUsage:                        MetricConfig{Enabled: false},
 					OracledbQueriesParallelized:                   MetricConfig{Enabled: false},
 					OracledbSessionsLimit:                         MetricConfig{Enabled: false},
-					OracledbSessionsUsage:                         MetricConfig{Enabled: false},
-					OracledbTablespaceSizeLimit:                   MetricConfig{Enabled: false},
-					OracledbTablespaceSizeUsage:                   MetricConfig{Enabled: false},
-					OracledbTransactionsLimit:                     MetricConfig{Enabled: false},
-					OracledbTransactionsUsage:                     MetricConfig{Enabled: false},
-					OracledbUserCommits:                           MetricConfig{Enabled: false},
-					OracledbUserRollbacks:                         MetricConfig{Enabled: false},
+					OracledbSessionsUsage: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"session_type", "session_status"},
+					},
+					OracledbTablespaceSizeLimit: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"tablespace_name"},
+					},
+					OracledbTablespaceSizeUsage: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"tablespace_name"},
+					},
+					OracledbTransactionsLimit: MetricConfig{Enabled: false},
+					OracledbTransactionsUsage: MetricConfig{Enabled: false},
+					OracledbUserCommits:       MetricConfig{Enabled: false},
+					OracledbUserRollbacks:     MetricConfig{Enabled: false},
 				},
 				ResourceAttributes: ResourceAttributesConfig{
 					HostName:             ResourceAttributeConfig{Enabled: false},
 					OracledbInstanceName: ResourceAttributeConfig{Enabled: false},
+					ServiceInstanceID:    ResourceAttributeConfig{Enabled: false},
 				},
 			},
 		},
@@ -173,6 +198,7 @@ func TestResourceAttributesConfig(t *testing.T) {
 			want: ResourceAttributesConfig{
 				HostName:             ResourceAttributeConfig{Enabled: true},
 				OracledbInstanceName: ResourceAttributeConfig{Enabled: true},
+				ServiceInstanceID:    ResourceAttributeConfig{Enabled: true},
 			},
 		},
 		{
@@ -180,6 +206,7 @@ func TestResourceAttributesConfig(t *testing.T) {
 			want: ResourceAttributesConfig{
 				HostName:             ResourceAttributeConfig{Enabled: false},
 				OracledbInstanceName: ResourceAttributeConfig{Enabled: false},
+				ServiceInstanceID:    ResourceAttributeConfig{Enabled: false},
 			},
 		},
 	}

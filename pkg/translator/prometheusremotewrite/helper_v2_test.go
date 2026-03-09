@@ -19,16 +19,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
-	conventions "go.opentelemetry.io/otel/semconv/v1.25.0"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/coreinternal/testdata"
 )
 
 func TestAddResourceTargetInfoV2(t *testing.T) {
 	resourceAttrMap := map[string]any{
-		string(conventions.ServiceNameKey):       "service-name",
-		string(conventions.ServiceNamespaceKey):  "service-namespace",
-		string(conventions.ServiceInstanceIDKey): "service-instance-id",
+		"service.name":        "service-name",
+		"service.namespace":   "service-namespace",
+		"service.instance.id": "service-instance-id",
 	}
 	resourceWithServiceAttrs := pcommon.NewResource()
 	require.NoError(t, resourceWithServiceAttrs.Attributes().FromRaw(resourceAttrMap))
@@ -37,11 +36,11 @@ func TestAddResourceTargetInfoV2(t *testing.T) {
 	require.NoError(t, resourceWithOnlyServiceAttrs.Attributes().FromRaw(resourceAttrMap))
 	// service.name is an identifying resource attribute.
 	resourceWithOnlyServiceName := pcommon.NewResource()
-	resourceWithOnlyServiceName.Attributes().PutStr(string(conventions.ServiceNameKey), "service-name")
+	resourceWithOnlyServiceName.Attributes().PutStr("service.name", "service-name")
 	resourceWithOnlyServiceName.Attributes().PutStr("resource_attr", "resource-attr-val-1")
 	// service.instance.id is an identifying resource attribute.
 	resourceWithOnlyServiceID := pcommon.NewResource()
-	resourceWithOnlyServiceID.Attributes().PutStr(string(conventions.ServiceInstanceIDKey), "service-instance-id")
+	resourceWithOnlyServiceID.Attributes().PutStr("service.instance.id", "service-instance-id")
 	resourceWithOnlyServiceID.Attributes().PutStr("resource_attr", "resource-attr-val-1")
 	for _, tc := range []struct {
 		desc           string
@@ -131,7 +130,8 @@ func TestAddResourceTargetInfoV2(t *testing.T) {
 		t.Run(tc.desc, func(t *testing.T) {
 			converter := newPrometheusConverterV2(Settings{})
 
-			converter.addResourceTargetInfoV2(tc.resource, tc.settings, tc.timestamp)
+			err := converter.addResourceTargetInfoV2(tc.resource, tc.settings, tc.timestamp)
+			require.NoError(t, err)
 
 			if len(tc.wantLabels) == 0 || tc.settings.DisableTargetInfo {
 				assert.Empty(t, converter.timeSeries())
@@ -267,14 +267,15 @@ func TestPrometheusConverterV2_AddSummaryDataPoints(t *testing.T) {
 				Unit: unitNamer.Build(metric.Unit()),
 			}
 
-			converter.addSummaryDataPoints(
+			err := converter.addSummaryDataPoints(
 				metric.Summary().DataPoints(),
 				pcommon.NewResource(),
+				pcommon.NewInstrumentationScope(),
 				Settings{},
 				metric.Name(),
 				m,
 			)
-
+			require.NoError(t, err)
 			assert.Equal(t, tt.want(), converter.unique)
 			assert.Empty(t, converter.conflicts)
 		})
@@ -388,14 +389,15 @@ func TestPrometheusConverterV2_AddHistogramDataPoints(t *testing.T) {
 				Help: metric.Description(),
 				Unit: unitNamer.Build(metric.Unit()),
 			}
-			converter.addHistogramDataPoints(
+			err := converter.addHistogramDataPoints(
 				metric.Histogram().DataPoints(),
 				pcommon.NewResource(),
+				pcommon.NewInstrumentationScope(),
 				Settings{},
 				metric.Name(),
 				m,
 			)
-
+			require.NoError(t, err)
 			assert.Equal(t, tt.want(), converter.unique)
 			assert.Empty(t, converter.conflicts)
 		})

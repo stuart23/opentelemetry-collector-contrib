@@ -11,6 +11,13 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 )
 
+const (
+	AggregationStrategySum = "sum"
+	AggregationStrategyAvg = "avg"
+	AggregationStrategyMin = "min"
+	AggregationStrategyMax = "max"
+)
+
 // AttributeStartupMode specifies the value startup_mode attribute.
 type AttributeStartupMode int
 
@@ -108,6 +115,7 @@ func (m *metricWindowsServiceStatus) emit(metrics pmetric.MetricSlice) {
 
 func newMetricWindowsServiceStatus(cfg MetricConfig) metricWindowsServiceStatus {
 	m := metricWindowsServiceStatus{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()

@@ -4,6 +4,7 @@ package metadata
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"time"
 
@@ -12,6 +13,13 @@ import (
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver"
+)
+
+const (
+	AggregationStrategySum = "sum"
+	AggregationStrategyAvg = "avg"
+	AggregationStrategyMin = "min"
+	AggregationStrategyMax = "max"
 )
 
 var MetricsInfo = metricsInfo{
@@ -236,6 +244,7 @@ func (m *metricOracledbConsistentGets) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbConsistentGets(cfg MetricConfig) metricOracledbConsistentGets {
 	m := metricOracledbConsistentGets{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -287,6 +296,7 @@ func (m *metricOracledbCPUTime) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbCPUTime(cfg MetricConfig) metricOracledbCPUTime {
 	m := metricOracledbCPUTime{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -338,6 +348,7 @@ func (m *metricOracledbDbBlockGets) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbDbBlockGets(cfg MetricConfig) metricOracledbDbBlockGets {
 	m := metricOracledbDbBlockGets{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -389,6 +400,7 @@ func (m *metricOracledbDdlStatementsParallelized) emit(metrics pmetric.MetricSli
 
 func newMetricOracledbDdlStatementsParallelized(cfg MetricConfig) metricOracledbDdlStatementsParallelized {
 	m := metricOracledbDdlStatementsParallelized{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -438,6 +450,7 @@ func (m *metricOracledbDmlLocksLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbDmlLocksLimit(cfg MetricConfig) metricOracledbDmlLocksLimit {
 	m := metricOracledbDmlLocksLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -487,6 +500,7 @@ func (m *metricOracledbDmlLocksUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbDmlLocksUsage(cfg MetricConfig) metricOracledbDmlLocksUsage {
 	m := metricOracledbDmlLocksUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -538,6 +552,7 @@ func (m *metricOracledbDmlStatementsParallelized) emit(metrics pmetric.MetricSli
 
 func newMetricOracledbDmlStatementsParallelized(cfg MetricConfig) metricOracledbDmlStatementsParallelized {
 	m := metricOracledbDmlStatementsParallelized{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -589,6 +604,7 @@ func (m *metricOracledbEnqueueDeadlocks) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbEnqueueDeadlocks(cfg MetricConfig) metricOracledbEnqueueDeadlocks {
 	m := metricOracledbEnqueueDeadlocks{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -638,6 +654,7 @@ func (m *metricOracledbEnqueueLocksLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbEnqueueLocksLimit(cfg MetricConfig) metricOracledbEnqueueLocksLimit {
 	m := metricOracledbEnqueueLocksLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -687,6 +704,7 @@ func (m *metricOracledbEnqueueLocksUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbEnqueueLocksUsage(cfg MetricConfig) metricOracledbEnqueueLocksUsage {
 	m := metricOracledbEnqueueLocksUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -736,6 +754,7 @@ func (m *metricOracledbEnqueueResourcesLimit) emit(metrics pmetric.MetricSlice) 
 
 func newMetricOracledbEnqueueResourcesLimit(cfg MetricConfig) metricOracledbEnqueueResourcesLimit {
 	m := metricOracledbEnqueueResourcesLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -785,6 +804,7 @@ func (m *metricOracledbEnqueueResourcesUsage) emit(metrics pmetric.MetricSlice) 
 
 func newMetricOracledbEnqueueResourcesUsage(cfg MetricConfig) metricOracledbEnqueueResourcesUsage {
 	m := metricOracledbEnqueueResourcesUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -836,6 +856,7 @@ func (m *metricOracledbExchangeDeadlocks) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbExchangeDeadlocks(cfg MetricConfig) metricOracledbExchangeDeadlocks {
 	m := metricOracledbExchangeDeadlocks{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -887,6 +908,7 @@ func (m *metricOracledbExecutions) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbExecutions(cfg MetricConfig) metricOracledbExecutions {
 	m := metricOracledbExecutions{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -938,6 +960,7 @@ func (m *metricOracledbHardParses) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbHardParses(cfg MetricConfig) metricOracledbHardParses {
 	m := metricOracledbHardParses{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -989,6 +1012,7 @@ func (m *metricOracledbLogicalReads) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbLogicalReads(cfg MetricConfig) metricOracledbLogicalReads {
 	m := metricOracledbLogicalReads{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1040,6 +1064,7 @@ func (m *metricOracledbLogons) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbLogons(cfg MetricConfig) metricOracledbLogons {
 	m := metricOracledbLogons{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1091,6 +1116,7 @@ func (m *metricOracledbParallelOperationsDowngraded1To25Pct) emit(metrics pmetri
 
 func newMetricOracledbParallelOperationsDowngraded1To25Pct(cfg MetricConfig) metricOracledbParallelOperationsDowngraded1To25Pct {
 	m := metricOracledbParallelOperationsDowngraded1To25Pct{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1142,6 +1168,7 @@ func (m *metricOracledbParallelOperationsDowngraded25To50Pct) emit(metrics pmetr
 
 func newMetricOracledbParallelOperationsDowngraded25To50Pct(cfg MetricConfig) metricOracledbParallelOperationsDowngraded25To50Pct {
 	m := metricOracledbParallelOperationsDowngraded25To50Pct{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1193,6 +1220,7 @@ func (m *metricOracledbParallelOperationsDowngraded50To75Pct) emit(metrics pmetr
 
 func newMetricOracledbParallelOperationsDowngraded50To75Pct(cfg MetricConfig) metricOracledbParallelOperationsDowngraded50To75Pct {
 	m := metricOracledbParallelOperationsDowngraded50To75Pct{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1244,6 +1272,7 @@ func (m *metricOracledbParallelOperationsDowngraded75To99Pct) emit(metrics pmetr
 
 func newMetricOracledbParallelOperationsDowngraded75To99Pct(cfg MetricConfig) metricOracledbParallelOperationsDowngraded75To99Pct {
 	m := metricOracledbParallelOperationsDowngraded75To99Pct{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1295,6 +1324,7 @@ func (m *metricOracledbParallelOperationsDowngradedToSerial) emit(metrics pmetri
 
 func newMetricOracledbParallelOperationsDowngradedToSerial(cfg MetricConfig) metricOracledbParallelOperationsDowngradedToSerial {
 	m := metricOracledbParallelOperationsDowngradedToSerial{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1346,6 +1376,7 @@ func (m *metricOracledbParallelOperationsNotDowngraded) emit(metrics pmetric.Met
 
 func newMetricOracledbParallelOperationsNotDowngraded(cfg MetricConfig) metricOracledbParallelOperationsNotDowngraded {
 	m := metricOracledbParallelOperationsNotDowngraded{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1397,6 +1428,7 @@ func (m *metricOracledbParseCalls) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbParseCalls(cfg MetricConfig) metricOracledbParseCalls {
 	m := metricOracledbParseCalls{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1448,6 +1480,7 @@ func (m *metricOracledbPgaMemory) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbPgaMemory(cfg MetricConfig) metricOracledbPgaMemory {
 	m := metricOracledbPgaMemory{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1499,6 +1532,7 @@ func (m *metricOracledbPhysicalReadIoRequests) emit(metrics pmetric.MetricSlice)
 
 func newMetricOracledbPhysicalReadIoRequests(cfg MetricConfig) metricOracledbPhysicalReadIoRequests {
 	m := metricOracledbPhysicalReadIoRequests{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1550,6 +1584,7 @@ func (m *metricOracledbPhysicalReads) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbPhysicalReads(cfg MetricConfig) metricOracledbPhysicalReads {
 	m := metricOracledbPhysicalReads{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1601,6 +1636,7 @@ func (m *metricOracledbPhysicalReadsDirect) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbPhysicalReadsDirect(cfg MetricConfig) metricOracledbPhysicalReadsDirect {
 	m := metricOracledbPhysicalReadsDirect{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1652,6 +1688,7 @@ func (m *metricOracledbPhysicalWriteIoRequests) emit(metrics pmetric.MetricSlice
 
 func newMetricOracledbPhysicalWriteIoRequests(cfg MetricConfig) metricOracledbPhysicalWriteIoRequests {
 	m := metricOracledbPhysicalWriteIoRequests{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1703,6 +1740,7 @@ func (m *metricOracledbPhysicalWrites) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbPhysicalWrites(cfg MetricConfig) metricOracledbPhysicalWrites {
 	m := metricOracledbPhysicalWrites{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1754,6 +1792,7 @@ func (m *metricOracledbPhysicalWritesDirect) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbPhysicalWritesDirect(cfg MetricConfig) metricOracledbPhysicalWritesDirect {
 	m := metricOracledbPhysicalWritesDirect{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1803,6 +1842,7 @@ func (m *metricOracledbProcessesLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbProcessesLimit(cfg MetricConfig) metricOracledbProcessesLimit {
 	m := metricOracledbProcessesLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1852,6 +1892,7 @@ func (m *metricOracledbProcessesUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbProcessesUsage(cfg MetricConfig) metricOracledbProcessesUsage {
 	m := metricOracledbProcessesUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1903,6 +1944,7 @@ func (m *metricOracledbQueriesParallelized) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbQueriesParallelized(cfg MetricConfig) metricOracledbQueriesParallelized {
 	m := metricOracledbQueriesParallelized{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1952,6 +1994,7 @@ func (m *metricOracledbSessionsLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbSessionsLimit(cfg MetricConfig) metricOracledbSessionsLimit {
 	m := metricOracledbSessionsLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -1960,9 +2003,10 @@ func newMetricOracledbSessionsLimit(cfg MetricConfig) metricOracledbSessionsLimi
 }
 
 type metricOracledbSessionsUsage struct {
-	data     pmetric.Metric // data buffer for generated metric.
-	config   MetricConfig   // metric config provided by user.
-	capacity int            // max observed number of data points added to the metric.
+	data          pmetric.Metric // data buffer for generated metric.
+	config        MetricConfig   // metric config provided by user.
+	capacity      int            // max observed number of data points added to the metric.
+	aggDataPoints []int64        // slice containing number of aggregated datapoints at each index
 }
 
 // init fills oracledb.sessions.usage metric with initial data.
@@ -1972,18 +2016,51 @@ func (m *metricOracledbSessionsUsage) init() {
 	m.data.SetUnit("{sessions}")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricOracledbSessionsUsage) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, sessionTypeAttributeValue string, sessionStatusAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
-	dp := m.data.Gauge().DataPoints().AppendEmpty()
+
+	dp := pmetric.NewNumberDataPoint()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
+	if slices.Contains(m.config.EnabledAttributes, "session_type") {
+		dp.Attributes().PutStr("session_type", sessionTypeAttributeValue)
+	}
+	if slices.Contains(m.config.EnabledAttributes, "session_status") {
+		dp.Attributes().PutStr("session_status", sessionStatusAttributeValue)
+	}
+
+	var s string
+	dps := m.data.Gauge().DataPoints()
+	for i := 0; i < dps.Len(); i++ {
+		dpi := dps.At(i)
+		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
+			switch s = m.config.AggregationStrategy; s {
+			case AggregationStrategySum, AggregationStrategyAvg:
+				dpi.SetIntValue(dpi.IntValue() + val)
+				m.aggDataPoints[i] += 1
+				return
+			case AggregationStrategyMin:
+				if dpi.IntValue() > val {
+					dpi.SetIntValue(val)
+				}
+				return
+			case AggregationStrategyMax:
+				if dpi.IntValue() < val {
+					dpi.SetIntValue(val)
+				}
+				return
+			}
+		}
+	}
+
 	dp.SetIntValue(val)
-	dp.Attributes().PutStr("session_type", sessionTypeAttributeValue)
-	dp.Attributes().PutStr("session_status", sessionStatusAttributeValue)
+	m.aggDataPoints = append(m.aggDataPoints, 1)
+	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -1996,6 +2073,11 @@ func (m *metricOracledbSessionsUsage) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricOracledbSessionsUsage) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		if m.config.AggregationStrategy == AggregationStrategyAvg {
+			for i, aggCount := range m.aggDataPoints {
+				m.data.Gauge().DataPoints().At(i).SetIntValue(m.data.Gauge().DataPoints().At(i).IntValue() / aggCount)
+			}
+		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -2004,6 +2086,7 @@ func (m *metricOracledbSessionsUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbSessionsUsage(cfg MetricConfig) metricOracledbSessionsUsage {
 	m := metricOracledbSessionsUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2012,9 +2095,10 @@ func newMetricOracledbSessionsUsage(cfg MetricConfig) metricOracledbSessionsUsag
 }
 
 type metricOracledbTablespaceSizeLimit struct {
-	data     pmetric.Metric // data buffer for generated metric.
-	config   MetricConfig   // metric config provided by user.
-	capacity int            // max observed number of data points added to the metric.
+	data          pmetric.Metric // data buffer for generated metric.
+	config        MetricConfig   // metric config provided by user.
+	capacity      int            // max observed number of data points added to the metric.
+	aggDataPoints []int64        // slice containing number of aggregated datapoints at each index
 }
 
 // init fills oracledb.tablespace_size.limit metric with initial data.
@@ -2024,17 +2108,48 @@ func (m *metricOracledbTablespaceSizeLimit) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricOracledbTablespaceSizeLimit) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, tablespaceNameAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
-	dp := m.data.Gauge().DataPoints().AppendEmpty()
+
+	dp := pmetric.NewNumberDataPoint()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
+	if slices.Contains(m.config.EnabledAttributes, "tablespace_name") {
+		dp.Attributes().PutStr("tablespace_name", tablespaceNameAttributeValue)
+	}
+
+	var s string
+	dps := m.data.Gauge().DataPoints()
+	for i := 0; i < dps.Len(); i++ {
+		dpi := dps.At(i)
+		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
+			switch s = m.config.AggregationStrategy; s {
+			case AggregationStrategySum, AggregationStrategyAvg:
+				dpi.SetIntValue(dpi.IntValue() + val)
+				m.aggDataPoints[i] += 1
+				return
+			case AggregationStrategyMin:
+				if dpi.IntValue() > val {
+					dpi.SetIntValue(val)
+				}
+				return
+			case AggregationStrategyMax:
+				if dpi.IntValue() < val {
+					dpi.SetIntValue(val)
+				}
+				return
+			}
+		}
+	}
+
 	dp.SetIntValue(val)
-	dp.Attributes().PutStr("tablespace_name", tablespaceNameAttributeValue)
+	m.aggDataPoints = append(m.aggDataPoints, 1)
+	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -2047,6 +2162,11 @@ func (m *metricOracledbTablespaceSizeLimit) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricOracledbTablespaceSizeLimit) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		if m.config.AggregationStrategy == AggregationStrategyAvg {
+			for i, aggCount := range m.aggDataPoints {
+				m.data.Gauge().DataPoints().At(i).SetIntValue(m.data.Gauge().DataPoints().At(i).IntValue() / aggCount)
+			}
+		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -2055,6 +2175,7 @@ func (m *metricOracledbTablespaceSizeLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbTablespaceSizeLimit(cfg MetricConfig) metricOracledbTablespaceSizeLimit {
 	m := metricOracledbTablespaceSizeLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2063,9 +2184,10 @@ func newMetricOracledbTablespaceSizeLimit(cfg MetricConfig) metricOracledbTables
 }
 
 type metricOracledbTablespaceSizeUsage struct {
-	data     pmetric.Metric // data buffer for generated metric.
-	config   MetricConfig   // metric config provided by user.
-	capacity int            // max observed number of data points added to the metric.
+	data          pmetric.Metric // data buffer for generated metric.
+	config        MetricConfig   // metric config provided by user.
+	capacity      int            // max observed number of data points added to the metric.
+	aggDataPoints []int64        // slice containing number of aggregated datapoints at each index
 }
 
 // init fills oracledb.tablespace_size.usage metric with initial data.
@@ -2075,17 +2197,48 @@ func (m *metricOracledbTablespaceSizeUsage) init() {
 	m.data.SetUnit("By")
 	m.data.SetEmptyGauge()
 	m.data.Gauge().DataPoints().EnsureCapacity(m.capacity)
+	m.aggDataPoints = m.aggDataPoints[:0]
 }
 
 func (m *metricOracledbTablespaceSizeUsage) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64, tablespaceNameAttributeValue string) {
 	if !m.config.Enabled {
 		return
 	}
-	dp := m.data.Gauge().DataPoints().AppendEmpty()
+
+	dp := pmetric.NewNumberDataPoint()
 	dp.SetStartTimestamp(start)
 	dp.SetTimestamp(ts)
+	if slices.Contains(m.config.EnabledAttributes, "tablespace_name") {
+		dp.Attributes().PutStr("tablespace_name", tablespaceNameAttributeValue)
+	}
+
+	var s string
+	dps := m.data.Gauge().DataPoints()
+	for i := 0; i < dps.Len(); i++ {
+		dpi := dps.At(i)
+		if dp.Attributes().Equal(dpi.Attributes()) && dp.StartTimestamp() == dpi.StartTimestamp() && dp.Timestamp() == dpi.Timestamp() {
+			switch s = m.config.AggregationStrategy; s {
+			case AggregationStrategySum, AggregationStrategyAvg:
+				dpi.SetIntValue(dpi.IntValue() + val)
+				m.aggDataPoints[i] += 1
+				return
+			case AggregationStrategyMin:
+				if dpi.IntValue() > val {
+					dpi.SetIntValue(val)
+				}
+				return
+			case AggregationStrategyMax:
+				if dpi.IntValue() < val {
+					dpi.SetIntValue(val)
+				}
+				return
+			}
+		}
+	}
+
 	dp.SetIntValue(val)
-	dp.Attributes().PutStr("tablespace_name", tablespaceNameAttributeValue)
+	m.aggDataPoints = append(m.aggDataPoints, 1)
+	dp.MoveTo(dps.AppendEmpty())
 }
 
 // updateCapacity saves max length of data point slices that will be used for the slice capacity.
@@ -2098,6 +2251,11 @@ func (m *metricOracledbTablespaceSizeUsage) updateCapacity() {
 // emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
 func (m *metricOracledbTablespaceSizeUsage) emit(metrics pmetric.MetricSlice) {
 	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		if m.config.AggregationStrategy == AggregationStrategyAvg {
+			for i, aggCount := range m.aggDataPoints {
+				m.data.Gauge().DataPoints().At(i).SetIntValue(m.data.Gauge().DataPoints().At(i).IntValue() / aggCount)
+			}
+		}
 		m.updateCapacity()
 		m.data.MoveTo(metrics.AppendEmpty())
 		m.init()
@@ -2106,6 +2264,7 @@ func (m *metricOracledbTablespaceSizeUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbTablespaceSizeUsage(cfg MetricConfig) metricOracledbTablespaceSizeUsage {
 	m := metricOracledbTablespaceSizeUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2155,6 +2314,7 @@ func (m *metricOracledbTransactionsLimit) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbTransactionsLimit(cfg MetricConfig) metricOracledbTransactionsLimit {
 	m := metricOracledbTransactionsLimit{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2204,6 +2364,7 @@ func (m *metricOracledbTransactionsUsage) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbTransactionsUsage(cfg MetricConfig) metricOracledbTransactionsUsage {
 	m := metricOracledbTransactionsUsage{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2255,6 +2416,7 @@ func (m *metricOracledbUserCommits) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbUserCommits(cfg MetricConfig) metricOracledbUserCommits {
 	m := metricOracledbUserCommits{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2306,6 +2468,7 @@ func (m *metricOracledbUserRollbacks) emit(metrics pmetric.MetricSlice) {
 
 func newMetricOracledbUserRollbacks(cfg MetricConfig) metricOracledbUserRollbacks {
 	m := metricOracledbUserRollbacks{config: cfg}
+
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
 		m.init()
@@ -2446,6 +2609,12 @@ func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.Settings, opt
 	}
 	if mbc.ResourceAttributes.OracledbInstanceName.MetricsExclude != nil {
 		mb.resourceAttributeExcludeFilter["oracledb.instance.name"] = filter.CreateFilter(mbc.ResourceAttributes.OracledbInstanceName.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.ServiceInstanceID.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["service.instance.id"] = filter.CreateFilter(mbc.ResourceAttributes.ServiceInstanceID.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.ServiceInstanceID.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["service.instance.id"] = filter.CreateFilter(mbc.ResourceAttributes.ServiceInstanceID.MetricsExclude)
 	}
 
 	for _, op := range options {

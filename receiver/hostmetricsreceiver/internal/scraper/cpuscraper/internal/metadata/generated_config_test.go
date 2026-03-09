@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/stretchr/testify/require"
-
 	"go.opentelemetry.io/collector/confmap"
 	"go.opentelemetry.io/collector/confmap/confmaptest"
 )
@@ -27,11 +26,23 @@ func TestMetricsBuilderConfig(t *testing.T) {
 			name: "all_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					SystemCPUFrequency:     MetricConfig{Enabled: true},
+					SystemCPUFrequency: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"cpu"},
+					},
 					SystemCPULogicalCount:  MetricConfig{Enabled: true},
 					SystemCPUPhysicalCount: MetricConfig{Enabled: true},
-					SystemCPUTime:          MetricConfig{Enabled: true},
-					SystemCPUUtilization:   MetricConfig{Enabled: true},
+					SystemCPUTime: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []string{"cpu", "state"},
+					},
+					SystemCPUUtilization: MetricConfig{
+						Enabled:             true,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"cpu", "state"},
+					},
 				},
 			},
 		},
@@ -39,11 +50,23 @@ func TestMetricsBuilderConfig(t *testing.T) {
 			name: "none_set",
 			want: MetricsBuilderConfig{
 				Metrics: MetricsConfig{
-					SystemCPUFrequency:     MetricConfig{Enabled: false},
+					SystemCPUFrequency: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"cpu"},
+					},
 					SystemCPULogicalCount:  MetricConfig{Enabled: false},
 					SystemCPUPhysicalCount: MetricConfig{Enabled: false},
-					SystemCPUTime:          MetricConfig{Enabled: false},
-					SystemCPUUtilization:   MetricConfig{Enabled: false},
+					SystemCPUTime: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategySum,
+						EnabledAttributes:   []string{"cpu", "state"},
+					},
+					SystemCPUUtilization: MetricConfig{
+						Enabled:             false,
+						AggregationStrategy: AggregationStrategyAvg,
+						EnabledAttributes:   []string{"cpu", "state"},
+					},
 				},
 			},
 		},

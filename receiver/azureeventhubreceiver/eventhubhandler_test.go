@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	eventhub "github.com/Azure/azure-event-hubs-go/v3"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/messaging/azeventhubs/v2"
 	"github.com/stretchr/testify/assert"
@@ -17,6 +16,7 @@ import (
 	"go.opentelemetry.io/collector/component/componenttest"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/consumer/consumertest"
+	"go.opentelemetry.io/collector/extension/xextension/storage"
 	"go.opentelemetry.io/collector/receiver/receiverhelper"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 	"go.uber.org/zap"
@@ -35,7 +35,7 @@ func (mockHubWrapper) GetRuntimeInformation(context.Context) (*hubRuntimeInfo, e
 	}, nil
 }
 
-func (mockHubWrapper) Receive(ctx context.Context, _ string, _ hubHandler, _ bool) (listenerHandleWrapper, error) {
+func (mockHubWrapper) Receive(ctx context.Context, _ string, _ hubHandler, _ bool, _ *zap.Logger) (listenerHandleWrapper, error) {
 	return &mockListenerHandleWrapper{
 		ctx: ctx,
 	}, nil
@@ -101,6 +101,76 @@ func TestEventhubHandler_Start(t *testing.T) {
 
 	assert.NoError(t, ehHandler.run(t.Context(), componenttest.NewNopHost()))
 	assert.NoError(t, ehHandler.close(t.Context()))
+}
+
+func TestShouldInitializeStorageClient(t *testing.T) {
+	testCases := []struct {
+		name          string
+		storageClient storage.Client
+		storageID     *component.ID
+		expected      bool
+	}{
+		{
+			name:          "no storage client and no storage ID - should not initialize",
+			storageClient: nil,
+			storageID:     nil,
+			expected:      false,
+		},
+		{
+			name:          "no storage client but has storage ID - should initialize",
+			storageClient: nil,
+			storageID:     &component.ID{},
+			expected:      true,
+		},
+		{
+			name:          "has storage client and storage ID - should not initialize",
+			storageClient: &mockStorageClient{},
+			storageID:     &component.ID{},
+			expected:      false,
+		},
+		{
+			name:          "has storage client but no storage ID - should not initialize",
+			storageClient: &mockStorageClient{},
+			storageID:     nil,
+			expected:      false,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			result := shouldInitializeStorageClient(test.storageClient, test.storageID)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+type mockStorageClient struct {
+	storage map[string][]byte
+}
+
+func (m *mockStorageClient) Get(_ context.Context, key string) ([]byte, error) {
+	if len(m.storage[key]) > 0 {
+		return m.storage[key], nil
+	}
+	return nil, nil
+}
+
+func (m *mockStorageClient) Set(_ context.Context, key string, val []byte) error {
+	m.storage[key] = val
+	return nil
+}
+
+func (m *mockStorageClient) Delete(_ context.Context, key string) error {
+	m.storage[key] = []byte{}
+	return nil
+}
+
+func (*mockStorageClient) Batch(_ context.Context, _ ...*storage.Operation) error {
+	return nil
+}
+
+func (*mockStorageClient) Close(_ context.Context) error {
+	return nil
 }
 
 func TestEventhubHandler_newAzeventhubsMessageHandler(t *testing.T) {
@@ -182,19 +252,14 @@ func TestEventhubHandler_newLegacyMessageHandler(t *testing.T) {
 
 	now := time.Now()
 	err = ehHandler.newMessageHandler(t.Context(), &azureEvent{
-		EventHubEvent: &eventhub.Event{
-			Data:         []byte("hello"),
-			PartitionKey: nil,
-			Properties:   map[string]any{"foo": "bar"},
-			ID:           "11234",
-			SystemProperties: &eventhub.SystemProperties{
-				SequenceNumber: nil,
-				EnqueuedTime:   &now,
-				Offset:         nil,
-				PartitionID:    nil,
-				PartitionKey:   nil,
-				Annotations:    nil,
+		AzEventData: &azeventhubs.ReceivedEventData{
+			EventData: azeventhubs.EventData{
+				Body:       []byte("hello"),
+				Properties: map[string]any{"foo": "bar"},
 			},
+			EnqueuedTime: &now,
+			Offset:       "",
+			PartitionKey: nil,
 		},
 	})
 
