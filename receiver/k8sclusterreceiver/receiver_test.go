@@ -22,7 +22,11 @@ import (
 	"go.opentelemetry.io/collector/receiver"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -346,6 +350,152 @@ func TestReceiverWithMetadata(t *testing.T) {
 		"entity events not collected")
 
 	require.NoError(t, r.Shutdown(ctx))
+}
+
+// TestReceiverWithCustomResources exercises the full custom-resource path end to
+// end: dynamic informer creation and startup, the create/update/delete event
+// handlers registered in setupCustomResourceInformer, entity event emission, and
+// k8s.customresource.phase metric collection - through the real receiver Start
+// flow, not by calling the internal helpers directly.
+func TestReceiverWithCustomResources(t *testing.T) {
+	tt := componenttest.NewTelemetry()
+	defer func() {
+		require.NoError(t, tt.Shutdown(t.Context()))
+	}()
+
+	client := newFakeClientWithAllResources()
+
+	gvr := schema.GroupVersionResource{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"}
+	newHelmRelease := func(phase string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "helm.toolkit.fluxcd.io/v2",
+				"kind":       "HelmRelease",
+				"metadata": map[string]any{
+					"name":      "release1",
+					"namespace": "test-namespace",
+					"uid":       "release1-uid",
+				},
+				"status": map[string]any{"phase": phase},
+			},
+		}
+	}
+
+	scheme := runtime.NewScheme()
+	dynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme,
+		map[schema.GroupVersionResource]string{gvr: "HelmReleaseList"},
+		newHelmRelease("Ready"),
+	)
+
+	config := &Config{
+		CollectionInterval:   200 * time.Millisecond,
+		Distribution:         distributionKubernetes,
+		MetricsBuilderConfig: metadata.NewDefaultMetricsBuilderConfig(),
+		Resources: []metadata.CustomResourceConfig{
+			{Group: gvr.Group, Version: gvr.Version, Resource: gvr.Resource},
+		},
+	}
+
+	metricsSink := new(consumertest.MetricsSink)
+	logsSink := new(consumertest.LogsSink)
+
+	r, err := newReceiver(t.Context(), receiver.Settings{ID: component.NewID(metadata.Type), TelemetrySettings: tt.NewTelemetrySettings(), BuildInfo: component.NewDefaultBuildInfo()}, config)
+	require.NoError(t, err)
+	kr := r.(*kubernetesReceiver)
+	kr.metricsConsumer = metricsSink
+	kr.resourceWatcher.entityLogConsumer = logsSink
+	kr.resourceWatcher.makeClient = func(_ k8sconfig.APIConfig) (kubernetes.Interface, error) {
+		return client, nil
+	}
+	kr.resourceWatcher.makeDynamicClient = func(_ k8sconfig.APIConfig) (dynamic.Interface, error) {
+		return dynClient, nil
+	}
+	kr.resourceWatcher.initialTimeout = 10 * time.Second
+
+	ctx := t.Context()
+	require.NoError(t, kr.Start(ctx, newNopHost()))
+
+	findPhaseDataPoint := func() (int64, bool) {
+		for _, m := range metricsSink.AllMetrics() {
+			rms := m.ResourceMetrics()
+			for i := 0; i < rms.Len(); i++ {
+				sms := rms.At(i).ScopeMetrics()
+				for j := 0; j < sms.Len(); j++ {
+					ms := sms.At(j).Metrics()
+					for k := 0; k < ms.Len(); k++ {
+						if ms.At(k).Name() == "k8s.customresource.phase" {
+							dps := ms.At(k).Gauge().DataPoints()
+							if dps.Len() > 0 {
+								return dps.At(dps.Len() - 1).IntValue(), true
+							}
+						}
+					}
+				}
+			}
+		}
+		return 0, false
+	}
+
+	// The initial object (phase: Ready) should be collected as phase value 2.
+	require.Eventually(t, func() bool {
+		v, ok := findPhaseDataPoint()
+		return ok && v == 2
+	}, 10*time.Second, 100*time.Millisecond, "initial k8s.customresource.phase metric not collected")
+
+	// The create should also have produced an entity event for the k8s.helmrelease entity.
+	require.Eventually(t, func() bool {
+		for _, l := range logsSink.AllLogs() {
+			rls := l.ResourceLogs()
+			for i := 0; i < rls.Len(); i++ {
+				sls := rls.At(i).ScopeLogs()
+				for j := 0; j < sls.Len(); j++ {
+					lrs := sls.At(j).LogRecords()
+					for k := 0; k < lrs.Len(); k++ {
+						entityType, ok := lrs.At(k).Attributes().Get("otel.entity.type")
+						if ok && entityType.Str() == "k8s.helmrelease" {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}, 10*time.Second, 100*time.Millisecond, "entity event for custom resource not emitted")
+
+	metricsSink.Reset()
+
+	// Update the object's phase and expect the metric to converge to the new value.
+	_, err = dynClient.Resource(gvr).Namespace("test-namespace").Update(ctx, newHelmRelease("Failed"), v1.UpdateOptions{})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		v, ok := findPhaseDataPoint()
+		return ok && v == 4
+	}, 10*time.Second, 100*time.Millisecond, "updated k8s.customresource.phase metric not collected")
+
+	// Delete the object and expect it to stop being reported.
+	require.NoError(t, dynClient.Resource(gvr).Namespace("test-namespace").Delete(ctx, "release1", v1.DeleteOptions{}))
+
+	require.Eventually(t, func() bool {
+		for _, l := range logsSink.AllLogs() {
+			rls := l.ResourceLogs()
+			for i := 0; i < rls.Len(); i++ {
+				sls := rls.At(i).ScopeLogs()
+				for j := 0; j < sls.Len(); j++ {
+					lrs := sls.At(j).LogRecords()
+					for k := 0; k < lrs.Len(); k++ {
+						eventType, ok := lrs.At(k).Attributes().Get("otel.entity.event.type")
+						if ok && eventType.Str() == "entity_delete" {
+							return true
+						}
+					}
+				}
+			}
+		}
+		return false
+	}, 10*time.Second, 100*time.Millisecond, "entity delete event for custom resource not emitted")
+
+	require.NoError(t, kr.Shutdown(ctx))
 }
 
 func getUpdatedPod(pod *corev1.Pod) any {

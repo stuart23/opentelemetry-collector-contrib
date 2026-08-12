@@ -82,6 +82,43 @@ When enabled, this setting produces the following node-level metrics (one per se
 - `resource_attributes`: Allows to enable/disable resource attributes.
 - `namespace` (deprecated, use `namespaces` instead): Allows to observe resources for a particular namespace only. If this option is set to a non-empty string, `Nodes`, `Namespaces` and `ClusterResourceQuotas` will not be observed.
 - `namespaces`: Allows to observe resources for a list of given namespaces. If this option is set, `Nodes`, `Namespaces` and `ClusterResourceQuotas` will not be observed, as those are cluster-scoped resources.
+- `resources` (default = `[]`): **EXPERIMENTAL, config shape may change in a future release.** A list of additional, explicitly-named custom resources (CRDs) to watch, in addition to the built-in kinds this receiver always observes. Each entry requires:
+  - `group`: The API group of the custom resource, e.g. `helm.toolkit.fluxcd.io`. Empty string for the core group.
+  - `version` (optional): The API version of the custom resource, e.g. `v2`. If omitted, the server's preferred version for this `group`/`resource` is resolved via discovery at startup. Only the preferred version is ever watched, even if a CRD serves several: every served version of a CRD is a view onto the same stored objects (reconciled by a conversion webhook), so watching more than one would double-count the same resources. If the given `group`/`resource` can't be found on the server, that entry is skipped with a warning log rather than failing the receiver.
+  - `resource`: The plural resource name of the custom resource, e.g. `helmreleases`.
+  - `phase_field` (default = `status.phase`): The dot-separated path within the object to read its phase/state string from.
+  - `phase_mapping` (default = `{}`): Adds to, or overrides, the default phase string to value mapping (below) for this resource.
+
+  Wildcards (`*`) are not supported for `group`, `version`, or `resource` — every watched resource must be named explicitly. This is a deliberate restriction: broad/wildcard selection makes it easy to accidentally collect and ship an unbounded, unpredictable volume of data on misconfiguration.
+
+  Each configured resource emits a generic `k8s.customresource` entity (with `k8s.customresource.kind`, `k8s.customresource.group`, and `k8s.customresource.version` attributes to disambiguate between multiple configured types) and a `k8s.customresource.phase` gauge metric. The metric's value comes from reading `phase_field` off the object and mapping it to a number:
+
+  | State strings                                   | Value |
+  | ------------------------------------------------ | ----- |
+  | `Pending`, `New`, `Provisioning`, `Progressing`   | 1     |
+  | `Ready`, `Active`, `Running`                      | 2     |
+  | `Terminating`, `Deleting`, `Succeeded`            | 3     |
+  | `Failed`, `Error`                                 | 4     |
+  | any other value, or a missing/empty field         | 5     |
+
+  `phase_mapping` entries are layered on top of this default table and can add new strings or override a default entry's value, scoped to that one resource.
+
+  Example:
+
+  ```yaml
+    k8s_cluster:
+      resources:
+        - group: helm.toolkit.fluxcd.io
+          version: v2
+          resource: helmreleases
+          phase_mapping:
+            WaitingForRetentionExpiryToDelete: 99
+        # version omitted: resolved via discovery at startup.
+        - group: source.toolkit.fluxcd.io
+          resource: gitrepositories
+  ```
+
+  Watching a custom resource requires granting this receiver `get`, `list`, and `watch` on that resource - see [RBAC](#rbac) below.
 
 Example:
 
@@ -301,6 +338,19 @@ rules:
     - list
     - watch
 EOF
+```
+
+If `resources` is configured to watch any custom resources, add one rule per configured `group`/`resource` pair. For example, for the `helm.toolkit.fluxcd.io`/`helmreleases` example above:
+
+```yaml
+- apiGroups:
+    - helm.toolkit.fluxcd.io
+  resources:
+    - helmreleases
+  verbs:
+    - get
+    - list
+    - watch
 ```
 
 ```bash

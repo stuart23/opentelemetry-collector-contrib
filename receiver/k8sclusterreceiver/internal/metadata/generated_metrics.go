@@ -3,15 +3,14 @@
 package metadata
 
 import (
-	"slices"
-	"time"
-
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/filter"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/receiver"
 	conventions "go.opentelemetry.io/otel/semconv/v1.18.0"
+	"slices"
+	"time"
 )
 
 const (
@@ -275,6 +274,9 @@ var MetricsInfo = metricsInfo{
 	K8sCronjobActiveJobs: metricInfo{
 		Name: "k8s.cronjob.active_jobs",
 	},
+	K8sCustomresourcePhase: metricInfo{
+		Name: "k8s.customresource.phase",
+	},
 	K8sDaemonsetCurrentScheduledNodes: metricInfo{
 		Name: "k8s.daemonset.current_scheduled_nodes",
 	},
@@ -421,6 +423,7 @@ type metricsInfo struct {
 	K8sContainerStorageLimit                metricInfo
 	K8sContainerStorageRequest              metricInfo
 	K8sCronjobActiveJobs                    metricInfo
+	K8sCustomresourcePhase                  metricInfo
 	K8sDaemonsetCurrentScheduledNodes       metricInfo
 	K8sDaemonsetDesiredScheduledNodes       metricInfo
 	K8sDaemonsetMisscheduledNodes           metricInfo
@@ -1118,6 +1121,56 @@ func (m *metricK8sCronjobActiveJobs) emit(metrics pmetric.MetricSlice) {
 
 func newMetricK8sCronjobActiveJobs(cfg K8sCronjobActiveJobsMetricConfig) metricK8sCronjobActiveJobs {
 	m := metricK8sCronjobActiveJobs{config: cfg}
+
+	if cfg.Enabled {
+		m.data = pmetric.NewMetric()
+		m.init()
+	}
+	return m
+}
+
+type metricK8sCustomresourcePhase struct {
+	data     pmetric.Metric                     // data buffer for generated metric.
+	config   K8sCustomresourcePhaseMetricConfig // metric config provided by user.
+	capacity int                                // max observed number of data points added to the metric.
+}
+
+// init fills k8s.customresource.phase metric with initial data.
+func (m *metricK8sCustomresourcePhase) init() {
+	m.data.SetName("k8s.customresource.phase")
+	m.data.SetDescription("The current phase of the custom resource (as configured via the receiver's `resources` option), mapped from its configured phase_field to a numeric value. Default mapping is 1 for Pending/New/Provisioning/Progressing, 2 for Ready/Active/Running, 3 for Terminating/Deleting/Succeeded, 4 for Failed/Error, and 5 for any other or missing value, unless overridden per-resource via phase_mapping.")
+	m.data.SetUnit("")
+	m.data.SetEmptyGauge()
+}
+
+func (m *metricK8sCustomresourcePhase) recordDataPoint(start pcommon.Timestamp, ts pcommon.Timestamp, val int64) {
+	if !m.config.Enabled {
+		return
+	}
+	dp := m.data.Gauge().DataPoints().AppendEmpty()
+	dp.SetStartTimestamp(start)
+	dp.SetTimestamp(ts)
+	dp.SetIntValue(val)
+}
+
+// updateCapacity saves max length of data point slices that will be used for the slice capacity.
+func (m *metricK8sCustomresourcePhase) updateCapacity() {
+	if m.data.Gauge().DataPoints().Len() > m.capacity {
+		m.capacity = m.data.Gauge().DataPoints().Len()
+	}
+}
+
+// emit appends recorded metric data to a metrics slice and prepares it for recording another set of data points.
+func (m *metricK8sCustomresourcePhase) emit(metrics pmetric.MetricSlice) {
+	if m.config.Enabled && m.data.Gauge().DataPoints().Len() > 0 {
+		m.updateCapacity()
+		m.data.MoveTo(metrics.AppendEmpty())
+		m.init()
+	}
+}
+
+func newMetricK8sCustomresourcePhase(cfg K8sCustomresourcePhaseMetricConfig) metricK8sCustomresourcePhase {
+	m := metricK8sCustomresourcePhase{config: cfg}
 
 	if cfg.Enabled {
 		m.data = pmetric.NewMetric()
@@ -3302,6 +3355,7 @@ type MetricsBuilder struct {
 	metricK8sContainerStorageLimit                metricK8sContainerStorageLimit
 	metricK8sContainerStorageRequest              metricK8sContainerStorageRequest
 	metricK8sCronjobActiveJobs                    metricK8sCronjobActiveJobs
+	metricK8sCustomresourcePhase                  metricK8sCustomresourcePhase
 	metricK8sDaemonsetCurrentScheduledNodes       metricK8sDaemonsetCurrentScheduledNodes
 	metricK8sDaemonsetDesiredScheduledNodes       metricK8sDaemonsetDesiredScheduledNodes
 	metricK8sDaemonsetMisscheduledNodes           metricK8sDaemonsetMisscheduledNodes
@@ -3380,6 +3434,7 @@ func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.Settings, opt
 		metricK8sContainerStorageLimit:                newMetricK8sContainerStorageLimit(mbc.Metrics.K8sContainerStorageLimit),
 		metricK8sContainerStorageRequest:              newMetricK8sContainerStorageRequest(mbc.Metrics.K8sContainerStorageRequest),
 		metricK8sCronjobActiveJobs:                    newMetricK8sCronjobActiveJobs(mbc.Metrics.K8sCronjobActiveJobs),
+		metricK8sCustomresourcePhase:                  newMetricK8sCustomresourcePhase(mbc.Metrics.K8sCustomresourcePhase),
 		metricK8sDaemonsetCurrentScheduledNodes:       newMetricK8sDaemonsetCurrentScheduledNodes(mbc.Metrics.K8sDaemonsetCurrentScheduledNodes),
 		metricK8sDaemonsetDesiredScheduledNodes:       newMetricK8sDaemonsetDesiredScheduledNodes(mbc.Metrics.K8sDaemonsetDesiredScheduledNodes),
 		metricK8sDaemonsetMisscheduledNodes:           newMetricK8sDaemonsetMisscheduledNodes(mbc.Metrics.K8sDaemonsetMisscheduledNodes),
@@ -3476,6 +3531,36 @@ func NewMetricsBuilder(mbc MetricsBuilderConfig, settings receiver.Settings, opt
 	}
 	if mbc.ResourceAttributes.K8sCronjobUID.MetricsExclude != nil {
 		mb.resourceAttributeExcludeFilter["k8s.cronjob.uid"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCronjobUID.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceGroup.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["k8s.customresource.group"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceGroup.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceGroup.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["k8s.customresource.group"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceGroup.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceKind.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["k8s.customresource.kind"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceKind.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceKind.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["k8s.customresource.kind"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceKind.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceName.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["k8s.customresource.name"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceName.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceName.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["k8s.customresource.name"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceName.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceUID.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["k8s.customresource.uid"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceUID.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceUID.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["k8s.customresource.uid"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceUID.MetricsExclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceVersion.MetricsInclude != nil {
+		mb.resourceAttributeIncludeFilter["k8s.customresource.version"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceVersion.MetricsInclude)
+	}
+	if mbc.ResourceAttributes.K8sCustomresourceVersion.MetricsExclude != nil {
+		mb.resourceAttributeExcludeFilter["k8s.customresource.version"] = filter.CreateFilter(mbc.ResourceAttributes.K8sCustomresourceVersion.MetricsExclude)
 	}
 	if mbc.ResourceAttributes.K8sDaemonsetName.MetricsInclude != nil {
 		mb.resourceAttributeIncludeFilter["k8s.daemonset.name"] = filter.CreateFilter(mbc.ResourceAttributes.K8sDaemonsetName.MetricsInclude)
@@ -3847,6 +3932,12 @@ func (mb *MetricsBuilder) ForK8sPod(e *K8sPodEntity) *K8sPodMetricsBuilder {
 	return &K8sPodMetricsBuilder{mb: mb, entity: e}
 }
 
+// ForK8sCustomresource returns a K8sCustomresourceMetricsBuilder that restricts metric recording
+// to metrics belonging to the k8s.customresource entity.
+func (mb *MetricsBuilder) ForK8sCustomresource(e *K8sCustomresourceEntity) *K8sCustomresourceMetricsBuilder {
+	return &K8sCustomresourceMetricsBuilder{mb: mb, entity: e}
+}
+
 // ForK8sContainer returns a K8sContainerMetricsBuilder that restricts metric recording
 // to metrics belonging to the k8s.container entity.
 func (mb *MetricsBuilder) ForK8sContainer(e *K8sContainerEntity) *K8sContainerMetricsBuilder {
@@ -3922,6 +4013,7 @@ func (mb *MetricsBuilder) EmitForResource(options ...ResourceMetricsOption) {
 	mb.metricK8sContainerStorageLimit.emit(ils.Metrics())
 	mb.metricK8sContainerStorageRequest.emit(ils.Metrics())
 	mb.metricK8sCronjobActiveJobs.emit(ils.Metrics())
+	mb.metricK8sCustomresourcePhase.emit(ils.Metrics())
 	mb.metricK8sDaemonsetCurrentScheduledNodes.emit(ils.Metrics())
 	mb.metricK8sDaemonsetDesiredScheduledNodes.emit(ils.Metrics())
 	mb.metricK8sDaemonsetMisscheduledNodes.emit(ils.Metrics())
@@ -4082,6 +4174,13 @@ func (mb *MetricsBuilder) RecordK8sContainerStorageRequestDataPoint(ts pcommon.T
 // Deprecated: Use mb.ForK8sCronjob(entity).RecordK8sCronjobActiveJobsDataPoint(...) instead.
 func (mb *MetricsBuilder) RecordK8sCronjobActiveJobsDataPoint(ts pcommon.Timestamp, val int64) {
 	mb.metricK8sCronjobActiveJobs.recordDataPoint(mb.startTime, ts, val)
+}
+
+// RecordK8sCustomresourcePhaseDataPoint adds a data point to k8s.customresource.phase metric.
+//
+// Deprecated: Use mb.ForK8sCustomresource(entity).RecordK8sCustomresourcePhaseDataPoint(...) instead.
+func (mb *MetricsBuilder) RecordK8sCustomresourcePhaseDataPoint(ts pcommon.Timestamp, val int64) {
+	mb.metricK8sCustomresourcePhase.recordDataPoint(mb.startTime, ts, val)
 }
 
 // RecordK8sDaemonsetCurrentScheduledNodesDataPoint adds a data point to k8s.daemonset.current_scheduled_nodes metric.

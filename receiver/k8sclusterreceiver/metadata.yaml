@@ -111,6 +111,19 @@ entities:
       - ref: k8s.namespace.name
       - ref: k8s.node.name
 
+  - type: k8s.customresource
+    brief: A Kubernetes custom resource (CRD-backed object), as configured via the receiver's `resources` option
+    stability: development
+    identity:
+      - ref: k8s.customresource.uid
+    description:
+      - ref: k8s.customresource.name
+    extra_attributes:
+      - ref: k8s.namespace.name
+      - ref: k8s.customresource.kind
+      - ref: k8s.customresource.group
+      - ref: k8s.customresource.version
+
   - type: k8s.container
     brief: A Kubernetes container
     stability: development
@@ -258,6 +271,31 @@ resource_attributes:
 
   k8s.cronjob.uid:
     description: The k8s CronJob uid.
+    type: string
+    enabled: true
+
+  k8s.customresource.group:
+    description: The API group of the custom resource.
+    type: string
+    enabled: true
+
+  k8s.customresource.kind:
+    description: The Kind of the custom resource, as reported by the Kubernetes API.
+    type: string
+    enabled: true
+
+  k8s.customresource.name:
+    description: The name of the custom resource.
+    type: string
+    enabled: true
+
+  k8s.customresource.uid:
+    description: The UID of the custom resource.
+    type: string
+    enabled: true
+
+  k8s.customresource.version:
+    description: The API version of the custom resource.
     type: string
     enabled: true
 
@@ -662,6 +700,15 @@ metrics:
     gauge:
       value_type: int
     entity: k8s.cronjob
+
+  k8s.customresource.phase:
+    enabled: true
+    description: The current phase of the custom resource (as configured via the receiver's `resources` option), mapped from its configured phase_field to a numeric value. Default mapping is 1 for Pending/New/Provisioning/Progressing, 2 for Ready/Active/Running, 3 for Terminating/Deleting/Succeeded, 4 for Failed/Error, and 5 for any other or missing value, unless overridden per-resource via phase_mapping.
+    unit: ""
+    stability: development
+    gauge:
+      value_type: int
+    entity: k8s.customresource
 
   k8s.daemonset.current_scheduled_nodes:
     enabled: true

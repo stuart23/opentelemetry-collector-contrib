@@ -100,6 +100,14 @@ The number of actively running jobs for a cronjob
 | ---- | ----------- | ---------- | --------- |
 | {job} | Gauge | Int | Development |
 
+### k8s.customresource.phase
+
+The current phase of the custom resource (as configured via the receiver's `resources` option), mapped from its configured phase_field to a numeric value. Default mapping is 1 for Pending/New/Provisioning/Progressing, 2 for Ready/Active/Running, 3 for Terminating/Deleting/Succeeded, 4 for Failed/Error, and 5 for any other or missing value, unless overridden per-resource via phase_mapping.
+
+| Unit | Metric Type | Value Type | Stability |
+| ---- | ----------- | ---------- | --------- |
+|  | Gauge | Int | Development |
+
 ### k8s.daemonset.current_scheduled_nodes
 
 Number of nodes that are running at least 1 daemon pod and are supposed to run the daemon pod
@@ -535,6 +543,11 @@ The number of load balancer ingress points (external IPs/hostnames) assigned to 
 | k8s.container.status.last_terminated_reason | Last terminated reason of a container. | Any Str | false | - | - |
 | k8s.cronjob.name | The k8s CronJob name | Any Str | true | - | - |
 | k8s.cronjob.uid | The k8s CronJob uid. | Any Str | true | - | - |
+| k8s.customresource.group | The API group of the custom resource. | Any Str | true | - | - |
+| k8s.customresource.kind | The Kind of the custom resource, as reported by the Kubernetes API. | Any Str | true | - | - |
+| k8s.customresource.name | The name of the custom resource. | Any Str | true | - | - |
+| k8s.customresource.uid | The UID of the custom resource. | Any Str | true | - | - |
+| k8s.customresource.version | The API version of the custom resource. | Any Str | true | - | - |
 | k8s.daemonset.name | The k8s daemonset name. | Any Str | true | - | - |
 | k8s.daemonset.uid | The k8s daemonset uid. | Any Str | true | - | - |
 | k8s.deployment.name | The name of the Deployment. | Any Str | true | - | - |
@@ -695,6 +708,18 @@ A Kubernetes pod
 **Descriptive Attributes:**
 - `k8s.pod.name`
 - `k8s.pod.qos_class`
+
+### k8s.customresource
+
+A Kubernetes custom resource (CRD-backed object), as configured via the receiver's `resources` option
+
+**Stability:** Development
+
+**Identifying Attributes:**
+- `k8s.customresource.uid`
+
+**Descriptive Attributes:**
+- `k8s.customresource.name`
 
 ### k8s.container
 

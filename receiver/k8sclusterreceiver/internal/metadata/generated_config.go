@@ -270,6 +270,26 @@ func (ms *K8sCronjobActiveJobsMetricConfig) Unmarshal(parser *confmap.Conf) erro
 	return nil
 }
 
+// K8sCustomresourcePhaseMetricConfig provides config for the k8s.customresource.phase metric.
+type K8sCustomresourcePhaseMetricConfig struct {
+	Enabled          bool `mapstructure:"enabled"`
+	enabledSetByUser bool
+}
+
+func (ms *K8sCustomresourcePhaseMetricConfig) Unmarshal(parser *confmap.Conf) error {
+	if parser == nil {
+		return nil
+	}
+
+	err := parser.Unmarshal(ms)
+	if err != nil {
+		return err
+	}
+
+	ms.enabledSetByUser = parser.IsSet("enabled")
+	return nil
+}
+
 // K8sDaemonsetCurrentScheduledNodesMetricConfig provides config for the k8s.daemonset.current_scheduled_nodes metric.
 type K8sDaemonsetCurrentScheduledNodesMetricConfig struct {
 	Enabled          bool `mapstructure:"enabled"`
@@ -1179,6 +1199,7 @@ type MetricsConfig struct {
 	K8sContainerStorageLimit                K8sContainerStorageLimitMetricConfig                `mapstructure:"k8s.container.storage_limit"`
 	K8sContainerStorageRequest              K8sContainerStorageRequestMetricConfig              `mapstructure:"k8s.container.storage_request"`
 	K8sCronjobActiveJobs                    K8sCronjobActiveJobsMetricConfig                    `mapstructure:"k8s.cronjob.active_jobs"`
+	K8sCustomresourcePhase                  K8sCustomresourcePhaseMetricConfig                  `mapstructure:"k8s.customresource.phase"`
 	K8sDaemonsetCurrentScheduledNodes       K8sDaemonsetCurrentScheduledNodesMetricConfig       `mapstructure:"k8s.daemonset.current_scheduled_nodes"`
 	K8sDaemonsetDesiredScheduledNodes       K8sDaemonsetDesiredScheduledNodesMetricConfig       `mapstructure:"k8s.daemonset.desired_scheduled_nodes"`
 	K8sDaemonsetMisscheduledNodes           K8sDaemonsetMisscheduledNodesMetricConfig           `mapstructure:"k8s.daemonset.misscheduled_nodes"`
@@ -1260,6 +1281,9 @@ func DefaultMetricsConfig() MetricsConfig {
 			Enabled: true,
 		},
 		K8sCronjobActiveJobs: K8sCronjobActiveJobsMetricConfig{
+			Enabled: true,
+		},
+		K8sCustomresourcePhase: K8sCustomresourcePhaseMetricConfig{
 			Enabled: true,
 		},
 		K8sDaemonsetCurrentScheduledNodes: K8sDaemonsetCurrentScheduledNodesMetricConfig{
@@ -1428,6 +1452,11 @@ type ResourceAttributesConfig struct {
 	K8sContainerStatusLastTerminatedReason ResourceAttributeConfig `mapstructure:"k8s.container.status.last_terminated_reason"`
 	K8sCronjobName                         ResourceAttributeConfig `mapstructure:"k8s.cronjob.name"`
 	K8sCronjobUID                          ResourceAttributeConfig `mapstructure:"k8s.cronjob.uid"`
+	K8sCustomresourceGroup                 ResourceAttributeConfig `mapstructure:"k8s.customresource.group"`
+	K8sCustomresourceKind                  ResourceAttributeConfig `mapstructure:"k8s.customresource.kind"`
+	K8sCustomresourceName                  ResourceAttributeConfig `mapstructure:"k8s.customresource.name"`
+	K8sCustomresourceUID                   ResourceAttributeConfig `mapstructure:"k8s.customresource.uid"`
+	K8sCustomresourceVersion               ResourceAttributeConfig `mapstructure:"k8s.customresource.version"`
 	K8sDaemonsetName                       ResourceAttributeConfig `mapstructure:"k8s.daemonset.name"`
 	K8sDaemonsetUID                        ResourceAttributeConfig `mapstructure:"k8s.daemonset.uid"`
 	K8sDeploymentName                      ResourceAttributeConfig `mapstructure:"k8s.deployment.name"`
@@ -1499,6 +1528,21 @@ func DefaultResourceAttributesConfig() ResourceAttributesConfig {
 			Enabled: true,
 		},
 		K8sCronjobUID: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		K8sCustomresourceGroup: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		K8sCustomresourceKind: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		K8sCustomresourceName: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		K8sCustomresourceUID: ResourceAttributeConfig{
+			Enabled: true,
+		},
+		K8sCustomresourceVersion: ResourceAttributeConfig{
 			Enabled: true,
 		},
 		K8sDaemonsetName: ResourceAttributeConfig{

@@ -779,6 +779,123 @@ func TestEntityBuilders(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("k8s.customresource", func(t *testing.T) {
+		e := NewK8sCustomresourceEntity("k8s.customresource.uid-val")
+		require.NotNil(t, e)
+		e.SetK8sCustomresourceName("k8s.customresource.name-val")
+		e.SetK8sNamespaceName("k8s.namespace.name-val")
+		e.SetK8sCustomresourceKind("k8s.customresource.kind-val")
+		e.SetK8sCustomresourceGroup("k8s.customresource.group-val")
+		e.SetK8sCustomresourceVersion("k8s.customresource.version-val")
+
+		eb := mb.ForK8sCustomresource(e)
+		eb.RecordK8sCustomresourcePhaseDataPoint(ts, 1)
+		eb.Emit()
+		metrics := mb.Emit()
+
+		require.Equal(t, 1, metrics.ResourceMetrics().Len())
+		rm := metrics.ResourceMetrics().At(0)
+		entityVal, ok := entity.ResourceEntities(rm.Resource()).Get("k8s.customresource")
+		require.True(t, ok)
+		k8sCustomresourceUIDAttrVal, ok := entityVal.IdentifyingAttributes().Get("k8s.customresource.uid")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.uid-val", k8sCustomresourceUIDAttrVal.Str())
+		k8sCustomresourceNameAttrVal, ok := entityVal.DescriptiveAttributes().Get("k8s.customresource.name")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.name-val", k8sCustomresourceNameAttrVal.Str())
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.namespace.name")
+		assert.False(t, ok)
+		k8sNamespaceNameAttrVal, ok := rm.Resource().Attributes().Get("k8s.namespace.name")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.namespace.name-val", k8sNamespaceNameAttrVal.Str())
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.kind")
+		assert.False(t, ok)
+		k8sCustomresourceKindAttrVal, ok := rm.Resource().Attributes().Get("k8s.customresource.kind")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.kind-val", k8sCustomresourceKindAttrVal.Str())
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.group")
+		assert.False(t, ok)
+		k8sCustomresourceGroupAttrVal, ok := rm.Resource().Attributes().Get("k8s.customresource.group")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.group-val", k8sCustomresourceGroupAttrVal.Str())
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.version")
+		assert.False(t, ok)
+		k8sCustomresourceVersionAttrVal, ok := rm.Resource().Attributes().Get("k8s.customresource.version")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.version-val", k8sCustomresourceVersionAttrVal.Str())
+
+		require.Equal(t, 1, rm.ScopeMetrics().Len())
+		ms := rm.ScopeMetrics().At(0).Metrics()
+		assert.Equal(t, 1, ms.Len())
+	})
+	t.Run("k8s.customresource/disabled_identity_attr", func(t *testing.T) {
+		// When an identity attribute is disabled, the entity is not produced but
+		// other enabled attributes are still added to the resource directly.
+		cfg := NewDefaultMetricsBuilderConfig()
+		cfg.ResourceAttributes.K8sCustomresourceUID.Enabled = false
+		mb := NewMetricsBuilder(cfg, settings, WithStartTime(start))
+
+		e := NewK8sCustomresourceEntity("k8s.customresource.uid-val")
+		e.SetK8sCustomresourceName("k8s.customresource.name-val")
+
+		eb := mb.ForK8sCustomresource(e)
+		eb.RecordK8sCustomresourcePhaseDataPoint(ts, 1)
+		eb.Emit()
+		metrics := mb.Emit()
+
+		require.Equal(t, 1, metrics.ResourceMetrics().Len())
+		rm := metrics.ResourceMetrics().At(0)
+		// Entity must not be present since its identity attribute is disabled.
+		_, ok := entity.ResourceEntities(rm.Resource()).Get("k8s.customresource")
+		assert.False(t, ok)
+		// Enabled descriptive attributes should still be on the resource directly.
+		_, ok = rm.Resource().Attributes().Get("k8s.customresource.name")
+		assert.True(t, ok)
+	})
+	t.Run("k8s.customresource/disabled_descriptive_attr", func(t *testing.T) {
+		// When a descriptive attribute is disabled, the entity is still produced
+		// with its identity but the disabled attribute is not added.
+		cfg := NewDefaultMetricsBuilderConfig()
+		cfg.ResourceAttributes.K8sCustomresourceName.Enabled = false
+		cfg.ResourceAttributes.K8sNamespaceName.Enabled = false
+		cfg.ResourceAttributes.K8sCustomresourceKind.Enabled = false
+		cfg.ResourceAttributes.K8sCustomresourceGroup.Enabled = false
+		cfg.ResourceAttributes.K8sCustomresourceVersion.Enabled = false
+		mb := NewMetricsBuilder(cfg, settings, WithStartTime(start))
+
+		e := NewK8sCustomresourceEntity("k8s.customresource.uid-val")
+		e.SetK8sCustomresourceName("k8s.customresource.name-val")
+		e.SetK8sNamespaceName("k8s.namespace.name-val")
+		e.SetK8sCustomresourceKind("k8s.customresource.kind-val")
+		e.SetK8sCustomresourceGroup("k8s.customresource.group-val")
+		e.SetK8sCustomresourceVersion("k8s.customresource.version-val")
+
+		eb := mb.ForK8sCustomresource(e)
+		eb.RecordK8sCustomresourcePhaseDataPoint(ts, 1)
+		eb.Emit()
+		metrics := mb.Emit()
+
+		require.Equal(t, 1, metrics.ResourceMetrics().Len())
+		rm := metrics.ResourceMetrics().At(0)
+		// Entity must still be produced since identity attributes are enabled.
+		entityVal, ok := entity.ResourceEntities(rm.Resource()).Get("k8s.customresource")
+		require.True(t, ok)
+		k8sCustomresourceUIDAttrVal, ok := entityVal.IdentifyingAttributes().Get("k8s.customresource.uid")
+		require.True(t, ok)
+		assert.Equal(t, "k8s.customresource.uid-val", k8sCustomresourceUIDAttrVal.Str())
+		// Disabled descriptive/extra attributes must not be present.
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.name")
+		assert.False(t, ok)
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.namespace.name")
+		assert.False(t, ok)
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.kind")
+		assert.False(t, ok)
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.group")
+		assert.False(t, ok)
+		_, ok = entityVal.DescriptiveAttributes().Get("k8s.customresource.version")
+		assert.False(t, ok)
+	})
+
 	t.Run("k8s.container", func(t *testing.T) {
 		e := NewK8sContainerEntity("container.id-val")
 		require.NotNil(t, e)

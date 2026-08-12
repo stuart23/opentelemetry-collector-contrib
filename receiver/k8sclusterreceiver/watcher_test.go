@@ -20,8 +20,10 @@ import (
 	"go.uber.org/zap/zaptest/observer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
 
@@ -239,6 +241,119 @@ func TestSetupInformerForKind(t *testing.T) {
 
 	assert.Equal(t, 1, logs.Len())
 	assert.Equal(t, "Could not setup an informer for provided group version kind", logs.All()[0].Message)
+}
+
+func TestSetupCustomResourceInformers(t *testing.T) {
+	cfg := metadata.CustomResourceConfig{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"}
+
+	tests := []struct {
+		name                  string
+		config                *Config
+		wantInformerFactories int
+		wantStoreKeys         []string
+	}{
+		{
+			name:                  "cluster-wide",
+			config:                &Config{Resources: []metadata.CustomResourceConfig{cfg}},
+			wantInformerFactories: 1,
+			wantStoreKeys:         []string{metadata.ClusterWideInformerKey},
+		},
+		{
+			name: "namespaced",
+			config: &Config{
+				Resources:  []metadata.CustomResourceConfig{cfg},
+				Namespaces: []string{"namespace1", "namespace2"},
+			},
+			wantInformerFactories: 2,
+			wantStoreKeys:         []string{"namespace1", "namespace2"},
+		},
+		{
+			name:                  "no resources configured",
+			config:                &Config{},
+			wantInformerFactories: 0,
+			wantStoreKeys:         nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			scheme := runtime.NewScheme()
+			dynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+				cfg.GroupVersionResource(): "HelmReleaseList",
+			})
+
+			rw := &resourceWatcher{
+				logger:        zap.NewNop(),
+				metadataStore: metadata.NewStore(),
+				dynamicClient: dynClient,
+				config:        tt.config,
+			}
+
+			rw.setupCustomResourceInformers()
+
+			assert.Len(t, rw.informerFactories, tt.wantInformerFactories)
+
+			stores := rw.metadataStore.Get(cfg.GroupVersionKind())
+			for _, key := range tt.wantStoreKeys {
+				assert.Contains(t, stores, key)
+			}
+		})
+	}
+}
+
+func TestResolveCustomResourceVersions(t *testing.T) {
+	preferred := []*metav1.APIResourceList{
+		{
+			GroupVersion: "helm.toolkit.fluxcd.io/v2",
+			APIResources: []metav1.APIResource{{Name: "helmreleases", Kind: "HelmRelease"}},
+		},
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{{Name: "somecoreresource", Kind: "SomeCoreResource"}},
+		},
+	}
+
+	client := &fakeClientWithDiscovery{
+		Clientset: fake.NewClientset(),
+		discovery: &mockPreferredResourcesDiscovery{preferred: preferred},
+	}
+
+	obs, logs := observer.New(zap.WarnLevel)
+	rw := &resourceWatcher{
+		client: client,
+		logger: zap.New(obs),
+		config: &Config{
+			Resources: []metadata.CustomResourceConfig{
+				{Group: "helm.toolkit.fluxcd.io", Resource: "helmreleases"},                // resolvable
+				{Group: "", Resource: "somecoreresource"},                                  // resolvable, core group
+				{Group: "helm.toolkit.fluxcd.io", Version: "v1", Resource: "helmreleases"}, // already set: untouched
+				{Group: "unknown.example.com", Resource: "widgets"},                        // not found
+			},
+		},
+	}
+
+	require.NoError(t, rw.resolveCustomResourceVersions())
+
+	assert.Equal(t, "v2", rw.config.Resources[0].Version)
+	assert.Equal(t, "v1", rw.config.Resources[1].Version)
+	assert.Equal(t, "v1", rw.config.Resources[2].Version, "an already-configured version must not be overwritten")
+	assert.Empty(t, rw.config.Resources[3].Version)
+
+	require.Equal(t, 1, logs.Len())
+	assert.Contains(t, logs.All()[0].Message, "Could not resolve a version")
+}
+
+func TestResolveCustomResourceVersionsSkipsDiscoveryWhenUnneeded(t *testing.T) {
+	// A nil client would panic if Discovery() were called - this verifies that
+	// resolution short-circuits entirely when every entry already has a Version.
+	rw := &resourceWatcher{
+		config: &Config{
+			Resources: []metadata.CustomResourceConfig{
+				{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"},
+			},
+		},
+	}
+	assert.NoError(t, rw.resolveCustomResourceVersions())
 }
 
 // TestConditionalInformerSetup verifies that PV/PVC informers are only set up when their metrics

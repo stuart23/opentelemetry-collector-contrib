@@ -53,6 +53,12 @@ type Config struct {
 	// K8sLeaderElector defines the reference to the k8s leader elector extension
 	// use this when k8s cluster receiver needs to be deployed in HA mode
 	K8sLeaderElector *component.ID `mapstructure:"k8s_leader_elector"`
+
+	// Resources is a list of additional, explicitly-named custom resources (CRDs)
+	// to watch. A generic entity and a k8s.customresource.phase metric are emitted
+	// for each configured resource.
+	// EXPERIMENTAL: this config shape may change in a future release.
+	Resources []metadata.CustomResourceConfig `mapstructure:"resources"`
 }
 
 func (cfg *Config) Validate() error {
@@ -61,6 +67,15 @@ func (cfg *Config) Validate() error {
 	case distributionKubernetes:
 	default:
 		return fmt.Errorf("\"%s\" is not a supported distribution. Must be one of: \"openshift\", \"kubernetes\"", cfg.Distribution)
+	}
+
+	for i, r := range cfg.Resources {
+		if r.Resource == "" {
+			return fmt.Errorf("resources[%d]: resource must be set", i)
+		}
+		if r.Group == "*" || r.Version == "*" || r.Resource == "*" {
+			return fmt.Errorf("resources[%d]: wildcards are not supported for group, version, or resource", i)
+		}
 	}
 
 	return nil

@@ -3,15 +3,14 @@
 package metadata
 
 import (
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
+	"testing"
+	"time"
 )
 
 func TestLogsBuilderAppendLogRecord(t *testing.T) {
@@ -30,6 +29,11 @@ func TestLogsBuilderAppendLogRecord(t *testing.T) {
 	rb.SetK8sContainerStatusLastTerminatedReason("k8s.container.status.last_terminated_reason-val")
 	rb.SetK8sCronjobName("k8s.cronjob.name-val")
 	rb.SetK8sCronjobUID("k8s.cronjob.uid-val")
+	rb.SetK8sCustomresourceGroup("k8s.customresource.group-val")
+	rb.SetK8sCustomresourceKind("k8s.customresource.kind-val")
+	rb.SetK8sCustomresourceName("k8s.customresource.name-val")
+	rb.SetK8sCustomresourceUID("k8s.customresource.uid-val")
+	rb.SetK8sCustomresourceVersion("k8s.customresource.version-val")
 	rb.SetK8sDaemonsetName("k8s.daemonset.name-val")
 	rb.SetK8sDaemonsetUID("k8s.daemonset.uid-val")
 	rb.SetK8sDeploymentName("k8s.deployment.name-val")

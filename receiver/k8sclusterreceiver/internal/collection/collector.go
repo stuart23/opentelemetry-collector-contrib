@@ -15,9 +15,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	discoveryv1 "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/clusterresourcequota"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/cronjob"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/customresource"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/daemonset"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/deployment"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/gvk"
@@ -45,18 +47,21 @@ type DataCollector struct {
 	metadataStore            *metadata.Store
 	nodeConditionsToReport   []string
 	allocatableTypesToReport []string
+	customResources          []metadata.CustomResourceConfig
 	metricsBuilder           *metadata.MetricsBuilder
 }
 
 // NewDataCollector returns a DataCollector.
 func NewDataCollector(set receiver.Settings, ms *metadata.Store,
 	metricsBuilderConfig metadata.MetricsBuilderConfig, nodeConditionsToReport, allocatableTypesToReport []string,
+	customResources []metadata.CustomResourceConfig,
 ) *DataCollector {
 	return &DataCollector{
 		settings:                 set,
 		metadataStore:            ms,
 		nodeConditionsToReport:   nodeConditionsToReport,
 		allocatableTypesToReport: allocatableTypesToReport,
+		customResources:          customResources,
 		metricsBuilder:           metadata.NewMetricsBuilder(metricsBuilderConfig, set),
 	}
 }
@@ -123,6 +128,12 @@ func (dc *DataCollector) CollectMetricData(currentTime time.Time) pmetric.Metric
 		counts := serviceEndpointCounts[string(svc.UID)]
 		service.RecordMetrics(dc.settings.Logger, dc.metricsBuilder, svc, counts, ts)
 	})
+
+	for _, cfg := range dc.customResources {
+		dc.metadataStore.ForEach(cfg.GroupVersionKind(), func(o any) {
+			customresource.RecordMetrics(dc.metricsBuilder, cfg, o.(*unstructured.Unstructured), ts)
+		})
+	}
 
 	m := dc.metricsBuilder.Emit()
 	customRMs.MoveAndAppendTo(m.ResourceMetrics())

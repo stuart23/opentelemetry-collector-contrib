@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/receiver/receivertest"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/pdatatest/pmetrictest"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/gvk"
@@ -121,7 +123,7 @@ func TestCollectMetricData(t *testing.T) {
 		},
 	})
 
-	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, metadata.NewDefaultMetricsBuilderConfig(), []string{"Ready"}, nil)
+	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, metadata.NewDefaultMetricsBuilderConfig(), []string{"Ready"}, nil, nil)
 	m1 := dc.CollectMetricData(time.Now())
 
 	// Verify number of resource metrics only, content is tested in other tests.
@@ -150,7 +152,7 @@ func TestCollectServiceMetrics(t *testing.T) {
 
 	mbc := metadata.NewDefaultMetricsBuilderConfig()
 	mbc.Metrics.K8sServiceEndpointCount.Enabled = true
-	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, mbc, nil, nil)
+	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, mbc, nil, nil, nil)
 	m := dc.CollectMetricData(time.Now())
 
 	foundEndpointCount := false
@@ -202,7 +204,7 @@ func TestCollectLoadBalancerServiceMetrics(t *testing.T) {
 
 	mbc := metadata.NewDefaultMetricsBuilderConfig()
 	mbc.Metrics.K8sServiceLoadBalancerIngressCount.Enabled = true
-	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, mbc, nil, nil)
+	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, mbc, nil, nil, nil)
 	m := dc.CollectMetricData(time.Now())
 
 	foundLBIngressCount := false
@@ -223,4 +225,50 @@ func TestCollectLoadBalancerServiceMetrics(t *testing.T) {
 	}
 
 	assert.True(t, foundLBIngressCount, "Expected k8s.service.load_balancer.ingress.count metric for LoadBalancer service")
+}
+
+func TestCollectCustomResourceMetrics(t *testing.T) {
+	ms := metadata.NewStore()
+
+	cfg := metadata.CustomResourceConfig{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"}
+	helmRelease := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "helm.toolkit.fluxcd.io/v2",
+			"kind":       "HelmRelease",
+			"metadata": map[string]any{
+				"name":      "test-release",
+				"namespace": "test-namespace",
+				"uid":       "test-release-uid",
+			},
+			"status": map[string]any{"phase": "Ready"},
+		},
+	}
+
+	ms.Setup(cfg.GroupVersionKind(), metadata.ClusterWideInformerKey, &testutils.MockStore{
+		Cache: map[string]any{
+			"helmrelease1-uid": helmRelease,
+		},
+	})
+
+	dc := NewDataCollector(receivertest.NewNopSettings(metadata.Type), ms, metadata.NewDefaultMetricsBuilderConfig(),
+		nil, nil, []metadata.CustomResourceConfig{cfg})
+	m := dc.CollectMetricData(time.Now())
+
+	found := false
+	rm := m.ResourceMetrics()
+	for i := 0; i < rm.Len(); i++ {
+		attrs := rm.At(i).Resource().Attributes()
+		kind, ok := attrs.Get("k8s.customresource.kind")
+		if !ok || kind.Str() != "HelmRelease" {
+			continue
+		}
+		found = true
+		sm := rm.At(i).ScopeMetrics()
+		require.Equal(t, 1, sm.Len())
+		metrics := sm.At(0).Metrics()
+		require.Equal(t, 1, metrics.Len())
+		assert.Equal(t, "k8s.customresource.phase", metrics.At(0).Name())
+		assert.Equal(t, int64(2), metrics.At(0).Gauge().DataPoints().At(0).IntValue())
+	}
+	assert.True(t, found, "Expected a resource metric for the configured custom resource")
 }

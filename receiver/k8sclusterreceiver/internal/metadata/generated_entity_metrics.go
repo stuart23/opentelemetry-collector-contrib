@@ -574,6 +574,99 @@ func (e *K8sPodEntity) copyToResource(cfg ResourceAttributesConfig, res pcommon.
 	}
 }
 
+// K8sCustomresourceEntity represents a k8s.customresource entity.
+// Create one with NewK8sCustomresourceEntity and pass it to EmitForEntity.
+type K8sCustomresourceEntity struct {
+	k8sCustomresourceUID     string
+	k8sCustomresourceName    string
+	k8sNamespaceName         string
+	k8sCustomresourceKind    string
+	k8sCustomresourceGroup   string
+	k8sCustomresourceVersion string
+}
+
+// NewK8sCustomresourceEntity creates a new K8sCustomresourceEntity.
+// Identity attributes are required and must be provided at construction time.
+func NewK8sCustomresourceEntity(k8sCustomresourceUID string) *K8sCustomresourceEntity {
+	return &K8sCustomresourceEntity{
+		k8sCustomresourceUID: k8sCustomresourceUID,
+	}
+}
+
+// Description attribute setters for k8s.customresource.
+
+// SetK8sCustomresourceName sets the k8s.customresource.name description attribute.
+func (e *K8sCustomresourceEntity) SetK8sCustomresourceName(val string) {
+	e.k8sCustomresourceName = val
+}
+
+// Extra attribute setters for k8s.customresource.
+// These attributes are contextually relevant but are not part of the entity's identity or description.
+
+// SetK8sNamespaceName sets the k8s.namespace.name extra attribute on the resource.
+func (e *K8sCustomresourceEntity) SetK8sNamespaceName(val string) {
+	e.k8sNamespaceName = val
+}
+
+// SetK8sCustomresourceKind sets the k8s.customresource.kind extra attribute on the resource.
+func (e *K8sCustomresourceEntity) SetK8sCustomresourceKind(val string) {
+	e.k8sCustomresourceKind = val
+}
+
+// SetK8sCustomresourceGroup sets the k8s.customresource.group extra attribute on the resource.
+func (e *K8sCustomresourceEntity) SetK8sCustomresourceGroup(val string) {
+	e.k8sCustomresourceGroup = val
+}
+
+// SetK8sCustomresourceVersion sets the k8s.customresource.version extra attribute on the resource.
+func (e *K8sCustomresourceEntity) SetK8sCustomresourceVersion(val string) {
+	e.k8sCustomresourceVersion = val
+}
+
+// copyToResource populates res with the entity's attributes according to cfg.
+// If all identity attributes are enabled, an entity ref is produced; otherwise
+// the enabled attributes are written directly as plain resource attributes.
+func (e *K8sCustomresourceEntity) copyToResource(cfg ResourceAttributesConfig, res pcommon.Resource) {
+	if cfg.K8sCustomresourceUID.Enabled {
+		ent := entity.ResourceEntities(res).PutEmpty("k8s.customresource")
+		ent.IdentifyingAttributes().PutStr("k8s.customresource.uid", e.k8sCustomresourceUID)
+		if cfg.K8sCustomresourceName.Enabled {
+			ent.DescriptiveAttributes().PutStr("k8s.customresource.name", e.k8sCustomresourceName)
+		}
+		if cfg.K8sNamespaceName.Enabled {
+			res.Attributes().PutStr("k8s.namespace.name", e.k8sNamespaceName)
+		}
+		if cfg.K8sCustomresourceKind.Enabled {
+			res.Attributes().PutStr("k8s.customresource.kind", e.k8sCustomresourceKind)
+		}
+		if cfg.K8sCustomresourceGroup.Enabled {
+			res.Attributes().PutStr("k8s.customresource.group", e.k8sCustomresourceGroup)
+		}
+		if cfg.K8sCustomresourceVersion.Enabled {
+			res.Attributes().PutStr("k8s.customresource.version", e.k8sCustomresourceVersion)
+		}
+	} else {
+		if cfg.K8sCustomresourceUID.Enabled {
+			res.Attributes().PutStr("k8s.customresource.uid", e.k8sCustomresourceUID)
+		}
+		if cfg.K8sCustomresourceName.Enabled {
+			res.Attributes().PutStr("k8s.customresource.name", e.k8sCustomresourceName)
+		}
+		if cfg.K8sNamespaceName.Enabled {
+			res.Attributes().PutStr("k8s.namespace.name", e.k8sNamespaceName)
+		}
+		if cfg.K8sCustomresourceKind.Enabled {
+			res.Attributes().PutStr("k8s.customresource.kind", e.k8sCustomresourceKind)
+		}
+		if cfg.K8sCustomresourceGroup.Enabled {
+			res.Attributes().PutStr("k8s.customresource.group", e.k8sCustomresourceGroup)
+		}
+		if cfg.K8sCustomresourceVersion.Enabled {
+			res.Attributes().PutStr("k8s.customresource.version", e.k8sCustomresourceVersion)
+		}
+	}
+}
+
 // K8sContainerEntity represents a k8s.container entity.
 // Create one with NewK8sContainerEntity and pass it to EmitForEntity.
 type K8sContainerEntity struct {
@@ -1437,6 +1530,28 @@ func (eb *K8sPodMetricsBuilder) RecordK8sPodStatusReasonDataPoint(ts pcommon.Tim
 // disabled identity attributes suppress the entity (other enabled attributes are added directly
 // to the resource); disabled descriptive/extra attributes are omitted entirely.
 func (eb *K8sPodMetricsBuilder) Emit() {
+	res := pcommon.NewResource()
+	cfg := eb.mb.config.ResourceAttributes
+	eb.entity.copyToResource(cfg, res)
+	eb.mb.EmitForResource(withResourceMoved(res))
+}
+
+// K8sCustomresourceMetricsBuilder records metrics for the k8s.customresource entity.
+// Obtain one via MetricsBuilder.ForK8sCustomresource().
+type K8sCustomresourceMetricsBuilder struct {
+	mb     *MetricsBuilder
+	entity *K8sCustomresourceEntity
+}
+
+// RecordK8sCustomresourcePhaseDataPoint records a data point for the k8s.customresource.phase metric.
+func (eb *K8sCustomresourceMetricsBuilder) RecordK8sCustomresourcePhaseDataPoint(ts pcommon.Timestamp, val int64) {
+	eb.mb.metricK8sCustomresourcePhase.recordDataPoint(eb.mb.startTime, ts, val)
+}
+
+// Emit emits all pending metrics for the entity. Resource attributes are filtered by config:
+// disabled identity attributes suppress the entity (other enabled attributes are added directly
+// to the resource); disabled descriptive/extra attributes are omitted entirely.
+func (eb *K8sCustomresourceMetricsBuilder) Emit() {
 	res := pcommon.NewResource()
 	cfg := eb.mb.config.ResourceAttributes
 	eb.entity.copyToResource(cfg, res)

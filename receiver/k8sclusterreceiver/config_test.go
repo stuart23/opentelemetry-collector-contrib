@@ -99,3 +99,57 @@ func TestInvalidConfig(t *testing.T) {
 	assert.Error(t, err)
 	assert.ErrorContains(t, err, expectedErr)
 }
+
+func TestInvalidResourcesConfig(t *testing.T) {
+	tests := []struct {
+		name        string
+		resources   []metadata.CustomResourceConfig
+		expectedErr string
+	}{
+		{
+			name:        "missing resource",
+			resources:   []metadata.CustomResourceConfig{{Group: "helm.toolkit.fluxcd.io", Version: "v2"}},
+			expectedErr: "resources[0]: resource must be set",
+		},
+		{
+			name:        "wildcard group",
+			resources:   []metadata.CustomResourceConfig{{Group: "*", Version: "v2", Resource: "helmreleases"}},
+			expectedErr: "resources[0]: wildcards are not supported",
+		},
+		{
+			name:        "wildcard resource",
+			resources:   []metadata.CustomResourceConfig{{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "*"}},
+			expectedErr: "resources[0]: wildcards are not supported",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{
+				APIConfig:          k8sconfig.APIConfig{AuthType: k8sconfig.AuthTypeNone},
+				Distribution:       distributionKubernetes,
+				CollectionInterval: 30 * time.Second,
+				Resources:          tt.resources,
+			}
+			err := confmap.Validate(cfg)
+			assert.Error(t, err)
+			assert.ErrorContains(t, err, tt.expectedErr)
+		})
+	}
+}
+
+func TestValidResourcesConfig(t *testing.T) {
+	cfg := &Config{
+		APIConfig:            k8sconfig.APIConfig{AuthType: k8sconfig.AuthTypeNone},
+		Distribution:         distributionKubernetes,
+		CollectionInterval:   30 * time.Second,
+		MetricsBuilderConfig: metadata.NewDefaultMetricsBuilderConfig(),
+		Resources: []metadata.CustomResourceConfig{
+			{Group: "helm.toolkit.fluxcd.io", Version: "v2", Resource: "helmreleases"},
+			{Group: "", Version: "v1", Resource: "somecoreresource"},
+			// Version omitted: resolved via discovery at startup.
+			{Group: "source.toolkit.fluxcd.io", Resource: "gitrepositories"},
+		},
+	}
+	assert.NoError(t, confmap.Validate(cfg))
+}

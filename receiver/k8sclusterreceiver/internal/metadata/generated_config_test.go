@@ -65,6 +65,9 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					K8sCronjobActiveJobs: K8sCronjobActiveJobsMetricConfig{
 						Enabled: true,
 					},
+					K8sCustomresourcePhase: K8sCustomresourcePhaseMetricConfig{
+						Enabled: true,
+					},
 					K8sDaemonsetCurrentScheduledNodes: K8sDaemonsetCurrentScheduledNodesMetricConfig{
 						Enabled: true,
 					},
@@ -202,6 +205,11 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					K8sContainerStatusLastTerminatedReason: ResourceAttributeConfig{Enabled: true},
 					K8sCronjobName:                         ResourceAttributeConfig{Enabled: true},
 					K8sCronjobUID:                          ResourceAttributeConfig{Enabled: true},
+					K8sCustomresourceGroup:                 ResourceAttributeConfig{Enabled: true},
+					K8sCustomresourceKind:                  ResourceAttributeConfig{Enabled: true},
+					K8sCustomresourceName:                  ResourceAttributeConfig{Enabled: true},
+					K8sCustomresourceUID:                   ResourceAttributeConfig{Enabled: true},
+					K8sCustomresourceVersion:               ResourceAttributeConfig{Enabled: true},
 					K8sDaemonsetName:                       ResourceAttributeConfig{Enabled: true},
 					K8sDaemonsetUID:                        ResourceAttributeConfig{Enabled: true},
 					K8sDeploymentName:                      ResourceAttributeConfig{Enabled: true},
@@ -288,6 +296,9 @@ func TestMetricsBuilderConfig(t *testing.T) {
 						Enabled: false,
 					},
 					K8sCronjobActiveJobs: K8sCronjobActiveJobsMetricConfig{
+						Enabled: false,
+					},
+					K8sCustomresourcePhase: K8sCustomresourcePhaseMetricConfig{
 						Enabled: false,
 					},
 					K8sDaemonsetCurrentScheduledNodes: K8sDaemonsetCurrentScheduledNodesMetricConfig{
@@ -427,6 +438,11 @@ func TestMetricsBuilderConfig(t *testing.T) {
 					K8sContainerStatusLastTerminatedReason: ResourceAttributeConfig{Enabled: false},
 					K8sCronjobName:                         ResourceAttributeConfig{Enabled: false},
 					K8sCronjobUID:                          ResourceAttributeConfig{Enabled: false},
+					K8sCustomresourceGroup:                 ResourceAttributeConfig{Enabled: false},
+					K8sCustomresourceKind:                  ResourceAttributeConfig{Enabled: false},
+					K8sCustomresourceName:                  ResourceAttributeConfig{Enabled: false},
+					K8sCustomresourceUID:                   ResourceAttributeConfig{Enabled: false},
+					K8sCustomresourceVersion:               ResourceAttributeConfig{Enabled: false},
 					K8sDaemonsetName:                       ResourceAttributeConfig{Enabled: false},
 					K8sDaemonsetUID:                        ResourceAttributeConfig{Enabled: false},
 					K8sDeploymentName:                      ResourceAttributeConfig{Enabled: false},
@@ -476,7 +492,7 @@ func TestMetricsBuilderConfig(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := loadMetricsBuilderConfig(t, tt.name)
-			diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(K8sContainerCPULimitMetricConfig{}, K8sContainerCPURequestMetricConfig{}, K8sContainerEphemeralstorageLimitMetricConfig{}, K8sContainerEphemeralstorageRequestMetricConfig{}, K8sContainerMemoryLimitMetricConfig{}, K8sContainerMemoryRequestMetricConfig{}, K8sContainerReadyMetricConfig{}, K8sContainerRestartsMetricConfig{}, K8sContainerStatusReasonMetricConfig{}, K8sContainerStatusStateMetricConfig{}, K8sContainerStorageLimitMetricConfig{}, K8sContainerStorageRequestMetricConfig{}, K8sCronjobActiveJobsMetricConfig{}, K8sDaemonsetCurrentScheduledNodesMetricConfig{}, K8sDaemonsetDesiredScheduledNodesMetricConfig{}, K8sDaemonsetMisscheduledNodesMetricConfig{}, K8sDaemonsetReadyNodesMetricConfig{}, K8sDeploymentAvailableMetricConfig{}, K8sDeploymentDesiredMetricConfig{}, K8sHpaCurrentReplicasMetricConfig{}, K8sHpaDesiredReplicasMetricConfig{}, K8sHpaMaxReplicasMetricConfig{}, K8sHpaMinReplicasMetricConfig{}, K8sJobActivePodsMetricConfig{}, K8sJobDesiredSuccessfulPodsMetricConfig{}, K8sJobFailedPodsMetricConfig{}, K8sJobMaxParallelPodsMetricConfig{}, K8sJobSuccessfulPodsMetricConfig{}, K8sNamespacePhaseMetricConfig{}, K8sNodeConditionMetricConfig{}, K8sPersistentvolumeStatusPhaseMetricConfig{}, K8sPersistentvolumeStorageCapacityMetricConfig{}, K8sPersistentvolumeclaimStatusPhaseMetricConfig{}, K8sPersistentvolumeclaimStorageCapacityMetricConfig{}, K8sPersistentvolumeclaimStorageRequestMetricConfig{}, K8sPodPhaseMetricConfig{}, K8sPodStatusReasonMetricConfig{}, K8sReplicasetAvailableMetricConfig{}, K8sReplicasetDesiredMetricConfig{}, K8sReplicationControllerAvailableMetricConfig{}, K8sReplicationControllerDesiredMetricConfig{}, K8sResourceQuotaHardLimitMetricConfig{}, K8sResourceQuotaUsedMetricConfig{}, K8sServiceEndpointCountMetricConfig{}, K8sServiceLoadBalancerIngressCountMetricConfig{}, K8sStatefulsetCurrentPodsMetricConfig{}, K8sStatefulsetDesiredPodsMetricConfig{}, K8sStatefulsetReadyPodsMetricConfig{}, K8sStatefulsetUpdatedPodsMetricConfig{}, OpenshiftAppliedclusterquotaLimitMetricConfig{}, OpenshiftAppliedclusterquotaUsedMetricConfig{}, OpenshiftClusterquotaLimitMetricConfig{}, OpenshiftClusterquotaUsedMetricConfig{}, ResourceAttributeConfig{}))
+			diff := cmp.Diff(tt.want, cfg, cmpopts.IgnoreUnexported(K8sContainerCPULimitMetricConfig{}, K8sContainerCPURequestMetricConfig{}, K8sContainerEphemeralstorageLimitMetricConfig{}, K8sContainerEphemeralstorageRequestMetricConfig{}, K8sContainerMemoryLimitMetricConfig{}, K8sContainerMemoryRequestMetricConfig{}, K8sContainerReadyMetricConfig{}, K8sContainerRestartsMetricConfig{}, K8sContainerStatusReasonMetricConfig{}, K8sContainerStatusStateMetricConfig{}, K8sContainerStorageLimitMetricConfig{}, K8sContainerStorageRequestMetricConfig{}, K8sCronjobActiveJobsMetricConfig{}, K8sCustomresourcePhaseMetricConfig{}, K8sDaemonsetCurrentScheduledNodesMetricConfig{}, K8sDaemonsetDesiredScheduledNodesMetricConfig{}, K8sDaemonsetMisscheduledNodesMetricConfig{}, K8sDaemonsetReadyNodesMetricConfig{}, K8sDeploymentAvailableMetricConfig{}, K8sDeploymentDesiredMetricConfig{}, K8sHpaCurrentReplicasMetricConfig{}, K8sHpaDesiredReplicasMetricConfig{}, K8sHpaMaxReplicasMetricConfig{}, K8sHpaMinReplicasMetricConfig{}, K8sJobActivePodsMetricConfig{}, K8sJobDesiredSuccessfulPodsMetricConfig{}, K8sJobFailedPodsMetricConfig{}, K8sJobMaxParallelPodsMetricConfig{}, K8sJobSuccessfulPodsMetricConfig{}, K8sNamespacePhaseMetricConfig{}, K8sNodeConditionMetricConfig{}, K8sPersistentvolumeStatusPhaseMetricConfig{}, K8sPersistentvolumeStorageCapacityMetricConfig{}, K8sPersistentvolumeclaimStatusPhaseMetricConfig{}, K8sPersistentvolumeclaimStorageCapacityMetricConfig{}, K8sPersistentvolumeclaimStorageRequestMetricConfig{}, K8sPodPhaseMetricConfig{}, K8sPodStatusReasonMetricConfig{}, K8sReplicasetAvailableMetricConfig{}, K8sReplicasetDesiredMetricConfig{}, K8sReplicationControllerAvailableMetricConfig{}, K8sReplicationControllerDesiredMetricConfig{}, K8sResourceQuotaHardLimitMetricConfig{}, K8sResourceQuotaUsedMetricConfig{}, K8sServiceEndpointCountMetricConfig{}, K8sServiceLoadBalancerIngressCountMetricConfig{}, K8sStatefulsetCurrentPodsMetricConfig{}, K8sStatefulsetDesiredPodsMetricConfig{}, K8sStatefulsetReadyPodsMetricConfig{}, K8sStatefulsetUpdatedPodsMetricConfig{}, OpenshiftAppliedclusterquotaLimitMetricConfig{}, OpenshiftAppliedclusterquotaUsedMetricConfig{}, OpenshiftClusterquotaLimitMetricConfig{}, OpenshiftClusterquotaUsedMetricConfig{}, ResourceAttributeConfig{}))
 			require.Emptyf(t, diff, "Config mismatch (-expected +actual):\n%s", diff)
 		})
 	}
@@ -549,6 +565,11 @@ func TestResourceAttributesConfig(t *testing.T) {
 				K8sContainerStatusLastTerminatedReason: ResourceAttributeConfig{Enabled: true},
 				K8sCronjobName:                         ResourceAttributeConfig{Enabled: true},
 				K8sCronjobUID:                          ResourceAttributeConfig{Enabled: true},
+				K8sCustomresourceGroup:                 ResourceAttributeConfig{Enabled: true},
+				K8sCustomresourceKind:                  ResourceAttributeConfig{Enabled: true},
+				K8sCustomresourceName:                  ResourceAttributeConfig{Enabled: true},
+				K8sCustomresourceUID:                   ResourceAttributeConfig{Enabled: true},
+				K8sCustomresourceVersion:               ResourceAttributeConfig{Enabled: true},
 				K8sDaemonsetName:                       ResourceAttributeConfig{Enabled: true},
 				K8sDaemonsetUID:                        ResourceAttributeConfig{Enabled: true},
 				K8sDeploymentName:                      ResourceAttributeConfig{Enabled: true},
@@ -605,6 +626,11 @@ func TestResourceAttributesConfig(t *testing.T) {
 				K8sContainerStatusLastTerminatedReason: ResourceAttributeConfig{Enabled: false},
 				K8sCronjobName:                         ResourceAttributeConfig{Enabled: false},
 				K8sCronjobUID:                          ResourceAttributeConfig{Enabled: false},
+				K8sCustomresourceGroup:                 ResourceAttributeConfig{Enabled: false},
+				K8sCustomresourceKind:                  ResourceAttributeConfig{Enabled: false},
+				K8sCustomresourceName:                  ResourceAttributeConfig{Enabled: false},
+				K8sCustomresourceUID:                   ResourceAttributeConfig{Enabled: false},
+				K8sCustomresourceVersion:               ResourceAttributeConfig{Enabled: false},
 				K8sDaemonsetName:                       ResourceAttributeConfig{Enabled: false},
 				K8sDaemonsetUID:                        ResourceAttributeConfig{Enabled: false},
 				K8sDeploymentName:                      ResourceAttributeConfig{Enabled: false},

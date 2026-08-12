@@ -27,6 +27,8 @@ all_set:
       enabled: true
     k8s.cronjob.active_jobs:
       enabled: true
+    k8s.customresource.phase:
+      enabled: true
     k8s.daemonset.current_scheduled_nodes:
       enabled: true
     k8s.daemonset.desired_scheduled_nodes:
@@ -128,6 +130,16 @@ all_set:
     k8s.cronjob.name:
       enabled: true
     k8s.cronjob.uid:
+      enabled: true
+    k8s.customresource.group:
+      enabled: true
+    k8s.customresource.kind:
+      enabled: true
+    k8s.customresource.name:
+      enabled: true
+    k8s.customresource.uid:
+      enabled: true
+    k8s.customresource.version:
       enabled: true
     k8s.daemonset.name:
       enabled: true
@@ -241,6 +253,8 @@ reaggregate_set:
       enabled: true
     k8s.cronjob.active_jobs:
       enabled: true
+    k8s.customresource.phase:
+      enabled: true
     k8s.daemonset.current_scheduled_nodes:
       enabled: true
     k8s.daemonset.desired_scheduled_nodes:
@@ -342,6 +356,16 @@ reaggregate_set:
     k8s.cronjob.name:
       enabled: true
     k8s.cronjob.uid:
+      enabled: true
+    k8s.customresource.group:
+      enabled: true
+    k8s.customresource.kind:
+      enabled: true
+    k8s.customresource.name:
+      enabled: true
+    k8s.customresource.uid:
+      enabled: true
+    k8s.customresource.version:
       enabled: true
     k8s.daemonset.name:
       enabled: true
@@ -455,6 +479,8 @@ none_set:
       enabled: false
     k8s.cronjob.active_jobs:
       enabled: false
+    k8s.customresource.phase:
+      enabled: false
     k8s.daemonset.current_scheduled_nodes:
       enabled: false
     k8s.daemonset.desired_scheduled_nodes:
@@ -556,6 +582,16 @@ none_set:
     k8s.cronjob.name:
       enabled: false
     k8s.cronjob.uid:
+      enabled: false
+    k8s.customresource.group:
+      enabled: false
+    k8s.customresource.kind:
+      enabled: false
+    k8s.customresource.name:
+      enabled: false
+    k8s.customresource.uid:
+      enabled: false
+    k8s.customresource.version:
       enabled: false
     k8s.daemonset.name:
       enabled: false
@@ -676,6 +712,26 @@ filter_set_include:
       metrics_include:
         - regexp: ".*"
     k8s.cronjob.uid:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+    k8s.customresource.group:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+    k8s.customresource.kind:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+    k8s.customresource.name:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+    k8s.customresource.uid:
+      enabled: true
+      metrics_include:
+        - regexp: ".*"
+    k8s.customresource.version:
       enabled: true
       metrics_include:
         - regexp: ".*"
@@ -885,6 +941,26 @@ filter_set_exclude:
       enabled: true
       metrics_exclude:
         - strict: "k8s.cronjob.uid-val"
+    k8s.customresource.group:
+      enabled: true
+      metrics_exclude:
+        - strict: "k8s.customresource.group-val"
+    k8s.customresource.kind:
+      enabled: true
+      metrics_exclude:
+        - strict: "k8s.customresource.kind-val"
+    k8s.customresource.name:
+      enabled: true
+      metrics_exclude:
+        - strict: "k8s.customresource.name-val"
+    k8s.customresource.uid:
+      enabled: true
+      metrics_exclude:
+        - strict: "k8s.customresource.uid-val"
+    k8s.customresource.version:
+      enabled: true
+      metrics_exclude:
+        - strict: "k8s.customresource.version-val"
     k8s.daemonset.name:
       enabled: true
       metrics_exclude:

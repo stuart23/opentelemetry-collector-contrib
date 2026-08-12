@@ -23,7 +23,11 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
@@ -31,6 +35,7 @@ import (
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/k8sconfig"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/pkg/experimentalmetricmetadata"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/cronjob"
+	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/customresource"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/daemonset"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/deployment"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/receiver/k8sclusterreceiver/internal/gvk"
@@ -56,6 +61,7 @@ type sharedInformer interface {
 type resourceWatcher struct {
 	client              kubernetes.Interface
 	osQuotaClient       quotaclientset.Interface
+	dynamicClient       dynamic.Interface
 	informerFactories   []sharedInformer
 	metadataStore       *metadata.Store
 	logger              *zap.Logger
@@ -69,6 +75,7 @@ type resourceWatcher struct {
 	// For mocking.
 	makeClient               func(apiConf k8sconfig.APIConfig) (kubernetes.Interface, error)
 	makeOpenShiftQuotaClient func(apiConf k8sconfig.APIConfig) (quotaclientset.Interface, error)
+	makeDynamicClient        func(apiConf k8sconfig.APIConfig) (dynamic.Interface, error)
 }
 
 type metadataConsumer func(metadata []*experimentalmetricmetadata.MetadataUpdate) error
@@ -84,6 +91,7 @@ func newResourceWatcher(set receiver.Settings, cfg *Config, metadataStore *metad
 		config:                   cfg,
 		makeClient:               k8sconfig.MakeClient,
 		makeOpenShiftQuotaClient: k8sconfig.MakeOpenShiftQuotaClient,
+		makeDynamicClient:        k8sconfig.MakeDynamicClient,
 	}
 }
 
@@ -98,6 +106,16 @@ func (rw *resourceWatcher) initialize() error {
 		rw.osQuotaClient, err = rw.makeOpenShiftQuotaClient(rw.config.APIConfig)
 		if err != nil {
 			return fmt.Errorf("Failed to create OpenShift quota API client: %w", err)
+		}
+	}
+
+	if len(rw.config.Resources) > 0 {
+		rw.dynamicClient, err = rw.makeDynamicClient(rw.config.APIConfig)
+		if err != nil {
+			return fmt.Errorf("Failed to create Kubernetes dynamic client: %w", err)
+		}
+		if err = rw.resolveCustomResourceVersions(); err != nil {
+			return fmt.Errorf("Failed to resolve custom resource versions: %w", err)
 		}
 	}
 
@@ -180,6 +198,176 @@ func (rw *resourceWatcher) prepareSharedInformerFactory() error {
 		rw.informerFactories = append(rw.informerFactories, factory)
 	}
 
+	rw.setupCustomResourceInformers()
+
+	return nil
+}
+
+// resolveCustomResourceVersions fills in Version for any configured custom resource
+// that didn't specify one, using the server's preferred version for that
+// Group/Resource - mirroring the discovery-based resolution k8sobjectsreceiver's
+// `objects` config already does. Only the preferred version is ever resolved: a CRD
+// that serves several versions still has exactly one underlying set of stored
+// objects, so watching more than one version would double-count the same resources.
+// Entries whose Group/Resource can't be found are left with an empty Version and
+// skipped (with a warning) by setupCustomResourceInformers.
+func (rw *resourceWatcher) resolveCustomResourceVersions() error {
+	anyUnresolved := false
+	for _, cfg := range rw.config.Resources {
+		if cfg.Version == "" {
+			anyUnresolved = true
+			break
+		}
+	}
+	if !anyUnresolved {
+		return nil
+	}
+
+	preferred, err := rw.client.Discovery().ServerPreferredResources()
+	if preferred == nil && err != nil {
+		return fmt.Errorf("failed to fetch preferred server resources: %w", err)
+	}
+
+	for i, cfg := range rw.config.Resources {
+		if cfg.Version != "" {
+			continue
+		}
+		version, found := findPreferredVersion(preferred, cfg.Group, cfg.Resource)
+		if !found {
+			rw.logger.Warn("Could not resolve a version for configured custom resource; it will not be watched",
+				zap.String("group", cfg.Group), zap.String("resource", cfg.Resource))
+			continue
+		}
+		rw.config.Resources[i].Version = version
+	}
+	return nil
+}
+
+// findPreferredVersion returns the version of the given group/resource in the
+// server's preferred-resources list, as returned by ServerPreferredResources.
+func findPreferredVersion(preferred []*metav1.APIResourceList, group, resource string) (string, bool) {
+	for _, list := range preferred {
+		gv, err := schema.ParseGroupVersion(list.GroupVersion)
+		if err != nil || gv.Group != group {
+			continue
+		}
+		for i := range list.APIResources {
+			if list.APIResources[i].Name == resource {
+				return gv.Version, true
+			}
+		}
+	}
+	return "", false
+}
+
+// getDynamicInformerFactories creates the dynamic informer factories used to watch
+// the custom resources configured via Config.Resources. It mirrors getInformerFactories,
+// but for the dynamic client, since arbitrary CRDs aren't known to the typed
+// informers.SharedInformerFactory.
+func (rw *resourceWatcher) getDynamicInformerFactories() map[string]dynamicinformer.DynamicSharedInformerFactory {
+	factories := map[string]dynamicinformer.DynamicSharedInformerFactory{}
+
+	switch {
+	case len(rw.config.Namespaces) > 0:
+		for _, ns := range rw.config.Namespaces {
+			factories[ns] = dynamicinformer.NewFilteredDynamicSharedInformerFactory(rw.dynamicClient, rw.config.MetadataCollectionInterval, ns, nil)
+		}
+	case rw.config.Namespace != "":
+		factories[rw.config.Namespace] = dynamicinformer.NewFilteredDynamicSharedInformerFactory(rw.dynamicClient, rw.config.MetadataCollectionInterval, rw.config.Namespace, nil)
+	default:
+		factories[metadata.ClusterWideInformerKey] = dynamicinformer.NewFilteredDynamicSharedInformerFactory(rw.dynamicClient, rw.config.MetadataCollectionInterval, metav1.NamespaceAll, nil)
+	}
+
+	return factories
+}
+
+// setupCustomResourceInformers sets up one dynamic informer per configured custom
+// resource, per namespace being observed. Custom resources are represented as
+// *unstructured.Unstructured, so this is the one generic path that serves every
+// configured CRD, rather than a per-kind case as built-in kinds get in
+// setupInformerForKind.
+func (rw *resourceWatcher) setupCustomResourceInformers() {
+	if len(rw.config.Resources) == 0 {
+		return
+	}
+
+	dynFactories := rw.getDynamicInformerFactories()
+
+	for _, cfg := range rw.config.Resources {
+		if cfg.Version == "" {
+			// Version resolution failed for this entry; already warned in
+			// resolveCustomResourceVersions.
+			continue
+		}
+		for ns, factory := range dynFactories {
+			informer := factory.ForResource(cfg.GroupVersionResource()).Informer()
+			rw.setupCustomResourceInformer(cfg, ns, informer)
+		}
+	}
+
+	for _, factory := range dynFactories {
+		rw.informerFactories = append(rw.informerFactories, dynamicInformerFactoryAdapter{factory})
+	}
+}
+
+// setupCustomResourceInformer adds event handlers to a custom resource informer
+// and sets up a metadataStore. It's a variant of setupInformer that closes over the
+// resource's CustomResourceConfig, since - unlike built-in kinds - the object's Go
+// type (*unstructured.Unstructured) can't disambiguate which of possibly several
+// configured custom resources an incoming object belongs to.
+func (rw *resourceWatcher) setupCustomResourceInformer(cfg metadata.CustomResourceConfig, namespace string, informer cache.SharedIndexInformer) {
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj any) {
+			rw.waitForInitialInformerSync()
+			if !rw.hasDestination() {
+				return
+			}
+			rw.syncMetadataUpdate(
+				map[experimentalmetricmetadata.ResourceID]*metadata.KubernetesMetadata{},
+				customresource.GetMetadata(obj.(*unstructured.Unstructured), cfg),
+			)
+		},
+		UpdateFunc: func(oldObj, newObj any) {
+			rw.waitForInitialInformerSync()
+			if !rw.hasDestination() {
+				return
+			}
+			rw.syncMetadataUpdate(
+				customresource.GetMetadata(oldObj.(*unstructured.Unstructured), cfg),
+				customresource.GetMetadata(newObj.(*unstructured.Unstructured), cfg),
+			)
+		},
+		DeleteFunc: func(oldObj any) {
+			rw.waitForInitialInformerSync()
+			if !rw.hasDestination() {
+				return
+			}
+			rw.syncMetadataUpdate(
+				customresource.GetMetadata(oldObj.(*unstructured.Unstructured), cfg),
+				map[experimentalmetricmetadata.ResourceID]*metadata.KubernetesMetadata{},
+			)
+		},
+	})
+	if err != nil {
+		rw.logger.Error("error adding event handler to custom resource informer", zap.Error(err))
+	}
+	rw.metadataStore.Setup(cfg.GroupVersionKind(), namespace, informer.GetStore())
+}
+
+// dynamicInformerFactoryAdapter adapts a dynamicinformer.DynamicSharedInformerFactory
+// to the sharedInformer interface used by startWatchingResources. The two factory
+// types are otherwise identical, differing only in the return type of
+// WaitForCacheSync, which startWatchingResources discards anyway.
+type dynamicInformerFactoryAdapter struct {
+	factory dynamicinformer.DynamicSharedInformerFactory
+}
+
+func (d dynamicInformerFactoryAdapter) Start(stopCh <-chan struct{}) {
+	d.factory.Start(stopCh)
+}
+
+func (d dynamicInformerFactoryAdapter) WaitForCacheSync(stopCh <-chan struct{}) map[reflect.Type]bool {
+	d.factory.WaitForCacheSync(stopCh)
 	return nil
 }
 

@@ -22,6 +22,11 @@ func TestResourceBuilder(t *testing.T) {
 			rb.SetK8sContainerStatusLastTerminatedReason("k8s.container.status.last_terminated_reason-val")
 			rb.SetK8sCronjobName("k8s.cronjob.name-val")
 			rb.SetK8sCronjobUID("k8s.cronjob.uid-val")
+			rb.SetK8sCustomresourceGroup("k8s.customresource.group-val")
+			rb.SetK8sCustomresourceKind("k8s.customresource.kind-val")
+			rb.SetK8sCustomresourceName("k8s.customresource.name-val")
+			rb.SetK8sCustomresourceUID("k8s.customresource.uid-val")
+			rb.SetK8sCustomresourceVersion("k8s.customresource.version-val")
 			rb.SetK8sDaemonsetName("k8s.daemonset.name-val")
 			rb.SetK8sDaemonsetUID("k8s.daemonset.uid-val")
 			rb.SetK8sDeploymentName("k8s.deployment.name-val")
@@ -70,9 +75,9 @@ func TestResourceBuilder(t *testing.T) {
 
 			switch tt {
 			case "default":
-				assert.Equal(t, 38, res.Attributes().Len())
+				assert.Equal(t, 43, res.Attributes().Len())
 			case "all_set":
-				assert.Equal(t, 51, res.Attributes().Len())
+				assert.Equal(t, 56, res.Attributes().Len())
 			case "none_set":
 				assert.Equal(t, 0, res.Attributes().Len())
 				return
@@ -123,6 +128,31 @@ func TestResourceBuilder(t *testing.T) {
 			assert.True(t, ok)
 			if ok {
 				assert.Equal(t, "k8s.cronjob.uid-val", k8sCronjobUIDAttrVal.Str())
+			}
+			k8sCustomresourceGroupAttrVal, ok := res.Attributes().Get("k8s.customresource.group")
+			assert.True(t, ok)
+			if ok {
+				assert.Equal(t, "k8s.customresource.group-val", k8sCustomresourceGroupAttrVal.Str())
+			}
+			k8sCustomresourceKindAttrVal, ok := res.Attributes().Get("k8s.customresource.kind")
+			assert.True(t, ok)
+			if ok {
+				assert.Equal(t, "k8s.customresource.kind-val", k8sCustomresourceKindAttrVal.Str())
+			}
+			k8sCustomresourceNameAttrVal, ok := res.Attributes().Get("k8s.customresource.name")
+			assert.True(t, ok)
+			if ok {
+				assert.Equal(t, "k8s.customresource.name-val", k8sCustomresourceNameAttrVal.Str())
+			}
+			k8sCustomresourceUIDAttrVal, ok := res.Attributes().Get("k8s.customresource.uid")
+			assert.True(t, ok)
+			if ok {
+				assert.Equal(t, "k8s.customresource.uid-val", k8sCustomresourceUIDAttrVal.Str())
+			}
+			k8sCustomresourceVersionAttrVal, ok := res.Attributes().Get("k8s.customresource.version")
+			assert.True(t, ok)
+			if ok {
+				assert.Equal(t, "k8s.customresource.version-val", k8sCustomresourceVersionAttrVal.Str())
 			}
 			k8sDaemonsetNameAttrVal, ok := res.Attributes().Get("k8s.daemonset.name")
 			assert.True(t, ok)

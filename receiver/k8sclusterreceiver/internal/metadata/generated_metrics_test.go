@@ -87,6 +87,7 @@ func TestMetricsBuilder(t *testing.T) {
 			ebK8sCronjob := mb.ForK8sCronjob(NewK8sCronjobEntity("k8s.cronjob.uid-val"))
 			ebK8sJob := mb.ForK8sJob(NewK8sJobEntity("k8s.job.uid-val"))
 			ebK8sPod := mb.ForK8sPod(NewK8sPodEntity("k8s.pod.uid-val"))
+			ebK8sCustomresource := mb.ForK8sCustomresource(NewK8sCustomresourceEntity("k8s.customresource.uid-val"))
 			ebK8sContainer := mb.ForK8sContainer(NewK8sContainerEntity("container.id-val"))
 			ebK8sReplicationcontroller := mb.ForK8sReplicationcontroller(NewK8sReplicationcontrollerEntity("k8s.replicationcontroller.uid-val"))
 			ebK8sResourcequota := mb.ForK8sResourcequota(NewK8sResourcequotaEntity("k8s.resourcequota.uid-val"))
@@ -134,6 +135,9 @@ func TestMetricsBuilder(t *testing.T) {
 			defaultMetricsCount++
 			allMetricsCount++
 			ebK8sCronjob.RecordK8sCronjobActiveJobsDataPoint(ts, 1)
+			defaultMetricsCount++
+			allMetricsCount++
+			ebK8sCustomresource.RecordK8sCustomresourcePhaseDataPoint(ts, 1)
 			defaultMetricsCount++
 			allMetricsCount++
 			ebK8sDaemonset.RecordK8sDaemonsetCurrentScheduledNodesDataPoint(ts, 1)
@@ -272,6 +276,7 @@ func TestMetricsBuilder(t *testing.T) {
 			ebK8sCronjob.Emit()
 			ebK8sJob.Emit()
 			ebK8sPod.Emit()
+			ebK8sCustomresource.Emit()
 			ebK8sContainer.Emit()
 			ebK8sReplicationcontroller.Emit()
 			ebK8sResourcequota.Emit()
@@ -291,6 +296,11 @@ func TestMetricsBuilder(t *testing.T) {
 			rb.SetK8sContainerStatusLastTerminatedReason("k8s.container.status.last_terminated_reason-val")
 			rb.SetK8sCronjobName("k8s.cronjob.name-val")
 			rb.SetK8sCronjobUID("k8s.cronjob.uid-val")
+			rb.SetK8sCustomresourceGroup("k8s.customresource.group-val")
+			rb.SetK8sCustomresourceKind("k8s.customresource.kind-val")
+			rb.SetK8sCustomresourceName("k8s.customresource.name-val")
+			rb.SetK8sCustomresourceUID("k8s.customresource.uid-val")
+			rb.SetK8sCustomresourceVersion("k8s.customresource.version-val")
 			rb.SetK8sDaemonsetName("k8s.daemonset.name-val")
 			rb.SetK8sDaemonsetUID("k8s.daemonset.uid-val")
 			rb.SetK8sDeploymentName("k8s.deployment.name-val")
@@ -527,6 +537,18 @@ func TestMetricsBuilder(t *testing.T) {
 					assert.Equal(t, 1, mi.Gauge().DataPoints().Len())
 					assert.Equal(t, "The number of actively running jobs for a cronjob", mi.Description())
 					assert.Equal(t, "{job}", mi.Unit())
+					dp := mi.Gauge().DataPoints().At(0)
+					assert.Equal(t, start, dp.StartTimestamp())
+					assert.Equal(t, ts, dp.Timestamp())
+					assert.Equal(t, pmetric.NumberDataPointValueTypeInt, dp.ValueType())
+					assert.Equal(t, int64(1), dp.IntValue())
+				case "k8s.customresource.phase":
+					assert.False(t, validatedMetrics["k8s.customresource.phase"], "Found a duplicate in the metrics slice: k8s.customresource.phase")
+					validatedMetrics["k8s.customresource.phase"] = true
+					assert.Equal(t, pmetric.MetricTypeGauge, mi.Type())
+					assert.Equal(t, 1, mi.Gauge().DataPoints().Len())
+					assert.Equal(t, "The current phase of the custom resource (as configured via the receiver's `resources` option), mapped from its configured phase_field to a numeric value. Default mapping is 1 for Pending/New/Provisioning/Progressing, 2 for Ready/Active/Running, 3 for Terminating/Deleting/Succeeded, 4 for Failed/Error, and 5 for any other or missing value, unless overridden per-resource via phase_mapping.", mi.Description())
+					assert.Empty(t, mi.Unit())
 					dp := mi.Gauge().DataPoints().At(0)
 					assert.Equal(t, start, dp.StartTimestamp())
 					assert.Equal(t, ts, dp.Timestamp())

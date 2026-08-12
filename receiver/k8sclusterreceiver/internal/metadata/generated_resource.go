@@ -84,6 +84,41 @@ func (rb *ResourceBuilder) SetK8sCronjobUID(val string) {
 	}
 }
 
+// SetK8sCustomresourceGroup sets provided value as "k8s.customresource.group" attribute.
+func (rb *ResourceBuilder) SetK8sCustomresourceGroup(val string) {
+	if rb.config.K8sCustomresourceGroup.Enabled {
+		rb.res.Attributes().PutStr("k8s.customresource.group", val)
+	}
+}
+
+// SetK8sCustomresourceKind sets provided value as "k8s.customresource.kind" attribute.
+func (rb *ResourceBuilder) SetK8sCustomresourceKind(val string) {
+	if rb.config.K8sCustomresourceKind.Enabled {
+		rb.res.Attributes().PutStr("k8s.customresource.kind", val)
+	}
+}
+
+// SetK8sCustomresourceName sets provided value as "k8s.customresource.name" attribute.
+func (rb *ResourceBuilder) SetK8sCustomresourceName(val string) {
+	if rb.config.K8sCustomresourceName.Enabled {
+		rb.res.Attributes().PutStr("k8s.customresource.name", val)
+	}
+}
+
+// SetK8sCustomresourceUID sets provided value as "k8s.customresource.uid" attribute.
+func (rb *ResourceBuilder) SetK8sCustomresourceUID(val string) {
+	if rb.config.K8sCustomresourceUID.Enabled {
+		rb.res.Attributes().PutStr("k8s.customresource.uid", val)
+	}
+}
+
+// SetK8sCustomresourceVersion sets provided value as "k8s.customresource.version" attribute.
+func (rb *ResourceBuilder) SetK8sCustomresourceVersion(val string) {
+	if rb.config.K8sCustomresourceVersion.Enabled {
+		rb.res.Attributes().PutStr("k8s.customresource.version", val)
+	}
+}
+
 // SetK8sDaemonsetName sets provided value as "k8s.daemonset.name" attribute.
 func (rb *ResourceBuilder) SetK8sDaemonsetName(val string) {
 	if rb.config.K8sDaemonsetName.Enabled {
