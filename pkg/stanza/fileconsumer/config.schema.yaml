@@ -11,6 +11,8 @@ $defs:
         type: boolean
       encoding:
         type: string
+      file_cache_advise:
+        type: boolean
       fingerprint_size:
         $ref: /pkg/stanza/operator/helper.byte_size
       force_flush_period:
@@ -31,13 +33,19 @@ $defs:
         type: integer
       max_log_size:
         $ref: /pkg/stanza/operator/helper.byte_size
+      max_log_size_behavior:
+        type: string
       multiline:
         $ref: /pkg/stanza/split.config
+      on_truncate:
+        type: string
       poll_interval:
         type: string
         format: duration
       polls_to_archive:
         type: integer
+      skip_unmodified_files:
+        type: boolean
       start_at:
         type: string
     allOf:

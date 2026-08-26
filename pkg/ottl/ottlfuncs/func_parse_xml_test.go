@@ -6,8 +6,11 @@ package ottlfuncs
 import (
 	"context"
 	"errors"
+	"slices"
+	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 
@@ -21,6 +24,10 @@ func Test_ParseXML(t *testing.T) {
 		want        map[string]any
 		createError string
 		parseError  string
+		// parseErrorAnyOf is used instead of parseError when the wording of the
+		// error depends on the Go version in use. The error must contain at
+		// least one of the listed strings.
+		parseErrorAnyOf []string
 	}{
 		{
 			name: "Text values in nested elements",
@@ -279,6 +286,28 @@ func Test_ParseXML(t *testing.T) {
 			oArgs:       nil,
 			createError: "ParseXMLFactory args must be of type *ParseXMLArguments[K]",
 		},
+		{
+			name: "Exceeds max nesting depth",
+			oArgs: &ParseXMLArguments[any]{
+				Target: ottl.StandardStringGetter[any]{
+					Getter: func(context.Context, any) (any, error) {
+						const depth = maxXMLElementDepth + 2
+						return strings.Repeat("<a>", depth) + strings.Repeat("</a>", depth), nil
+					},
+				},
+			},
+			// Whichever depth guard trips first depends on the Go version.
+			// Through a custom xml.Unmarshaler, encoding/xml resets its own
+			// depth counter on every DecodeElement call up to Go 1.25.12 and
+			// 1.26.5, so maxXMLElementDepth is what rejects the input. As of
+			// Go 1.25.13 and 1.26.6 that counter is tracked on the decoder and
+			// accumulates across calls, so encoding/xml rejects the input one
+			// level earlier and reports its own error instead.
+			parseErrorAnyOf: []string{
+				"exceeded maximum XML nesting depth",
+				"exceeded max depth",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -296,6 +325,13 @@ func Test_ParseXML(t *testing.T) {
 				require.ErrorContains(t, err, tt.parseError)
 				return
 			}
+			if len(tt.parseErrorAnyOf) > 0 {
+				require.Error(t, err)
+				require.True(t, slices.ContainsFunc(tt.parseErrorAnyOf, func(want string) bool {
+					return strings.Contains(err.Error(), want)
+				}), "error %q contains none of %q", err, tt.parseErrorAnyOf)
+				return
+			}
 
 			require.NoError(t, err)
 
@@ -305,4 +341,40 @@ func Test_ParseXML(t *testing.T) {
 			require.Equal(t, tt.want, resultMap.AsRaw())
 		})
 	}
+}
+
+func Test_ParseXMLFactory(t *testing.T) {
+	t.Run("factory creation", func(t *testing.T) {
+		factory := NewParseXMLFactory[any]()
+		assert.Equal(t, "ParseXML", factory.Name())
+	})
+
+	t.Run("default arguments", func(t *testing.T) {
+		factory := NewParseXMLFactory[any]()
+		args := factory.CreateDefaultArguments()
+
+		assert.IsType(t, &ParseXMLArguments[any]{}, args)
+		assertArgumentFieldNames(t, args, []string{"Target"})
+	})
+
+	t.Run("function creation", func(t *testing.T) {
+		factory := NewParseXMLFactory[any]()
+		args := factory.CreateDefaultArguments()
+		xmlArgs, ok := args.(*ParseXMLArguments[any])
+		require.True(t, ok)
+		xmlArgs.Target = ottl.StandardStringGetter[any]{
+			Getter: func(context.Context, any) (any, error) {
+				return "<a>b</a>", nil
+			},
+		}
+
+		fn, err := factory.CreateFunction(ottl.FunctionContext{}, args)
+		require.NoError(t, err)
+		assert.NotNil(t, fn)
+	})
+
+	t.Run("invalid arguments type", func(t *testing.T) {
+		_, err := createParseXMLFunction[any](ottl.FunctionContext{}, "invalid args")
+		assert.ErrorContains(t, err, "ParseXMLFactory args must be of type *ParseXMLArguments[K]")
+	})
 }

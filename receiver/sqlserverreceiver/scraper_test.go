@@ -9,17 +9,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"go.opentelemetry.io/collector/component/componenttest"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/receiver/receivertest"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/common/testutil"
 	"github.com/open-telemetry/opentelemetry-collector-contrib/internal/sqlquery"
@@ -32,59 +36,109 @@ import (
 func configureAllScraperMetricsAndEvents(cfg *Config, enabled bool) {
 	// Some of these metrics are enabled by default, but it's still helpful to include
 	// in the case of using a config that may have previously disabled a metric.
-	cfg.Metrics.SqlserverBatchRequestRate.Enabled = enabled
-	cfg.Metrics.SqlserverBatchSQLCompilationRate.Enabled = enabled
-	cfg.Metrics.SqlserverBatchSQLRecompilationRate.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseBackupOrRestoreRate.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseCount.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseExecutionErrors.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseFullScanRate.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseIo.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseLatency.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseOperations.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseTempdbSpace.Enabled = enabled
-	cfg.Metrics.SqlserverDatabaseTempdbVersionStoreSize.Enabled = enabled
-	cfg.Metrics.SqlserverDeadlockRate.Enabled = enabled
-	cfg.Metrics.SqlserverIndexSearchRate.Enabled = enabled
-	cfg.Metrics.SqlserverLockTimeoutRate.Enabled = enabled
-	cfg.Metrics.SqlserverLockWaitCount.Enabled = enabled
-	cfg.Metrics.SqlserverLockWaitRate.Enabled = enabled
-	cfg.Metrics.SqlserverLockWaitTimeAvg.Enabled = enabled
-	cfg.Metrics.SqlserverLoginRate.Enabled = enabled
-	cfg.Metrics.SqlserverLogoutRate.Enabled = enabled
-	cfg.Metrics.SqlserverMemoryGrantsPendingCount.Enabled = enabled
-	cfg.Metrics.SqlserverMemoryUsage.Enabled = enabled
-	cfg.Metrics.SqlserverOsWaitDuration.Enabled = enabled
-	cfg.Metrics.SqlserverPageBufferCacheFreeListStallsRate.Enabled = enabled
-	cfg.Metrics.SqlserverPageBufferCacheHitRatio.Enabled = enabled
-	cfg.Metrics.SqlserverPageCheckpointFlushRate.Enabled = enabled
-	cfg.Metrics.SqlserverPageLazyWriteRate.Enabled = enabled
-	cfg.Metrics.SqlserverPageLifeExpectancy.Enabled = enabled
-	cfg.Metrics.SqlserverPageLookupRate.Enabled = enabled
-	cfg.Metrics.SqlserverPageOperationRate.Enabled = enabled
-	cfg.Metrics.SqlserverPageSplitRate.Enabled = enabled
-	cfg.Metrics.SqlserverProcessesBlocked.Enabled = enabled
-	cfg.Metrics.SqlserverReplicaDataRate.Enabled = enabled
-	cfg.Metrics.SqlserverResourcePoolDiskOperations.Enabled = enabled
-	cfg.Metrics.SqlserverResourcePoolDiskThrottledReadRate.Enabled = enabled
-	cfg.Metrics.SqlserverResourcePoolDiskThrottledWriteRate.Enabled = enabled
-	cfg.Metrics.SqlserverTableCount.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionDelay.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogFlushDataRate.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogFlushRate.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogFlushWaitRate.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogGrowthCount.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogShrinkCount.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionLogUsage.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionMirrorWriteRate.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionRate.Enabled = enabled
-	cfg.Metrics.SqlserverTransactionWriteRate.Enabled = enabled
-	cfg.Metrics.SqlserverUserConnectionCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverAccessScanRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverBatchRequestRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCPUUtilization.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverBatchSQLCompilationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverBatchSQLRecompilationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverConnectionResetRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseBackupOrRestoreRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseExecutionErrors.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseFullScanRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseIo.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseLatency.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseOperations.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseTempdbSpace.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDatabaseTempdbVersionStoreSize.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDeadlockRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDiskOperations.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDiskIo.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverErrorRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverExtentOperationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverGhostRecordSkippedRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexFragmentation.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexPageCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexPageUtilization.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexRecordCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexSearchRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverIndexSize.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLatchSuperlatchCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLatchSuperlatchTransitionRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLatchWaitRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLatchWaitTimeAvg.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLatchWaitTimeTotal.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockBlockCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockEscalationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockMemory.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockRequestRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockTimeoutRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockWaitCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockWaitRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockWaitTimeAvg.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLockWaitTimeTotal.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLoginRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverLogoutRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverMemoryArea.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverMemoryCacheObjectCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverMemoryGrantsPendingCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverMemoryPageCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverMemoryUsage.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverOsWaitDuration.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageAllocationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageCompressionRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageBufferCacheFreeListStallsRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageBufferCacheHitRatio.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageCheckpointFlushRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageLazyWriteRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageLifeExpectancy.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageLookupRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageOperationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageReadAheadRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPageSplitRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverProcessesBlocked.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverReplicaDataRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverResourcePoolDiskOperations.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverResourcePoolDiskThrottledReadRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverResourcePoolDiskThrottledWriteRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverScanPointRevalidationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverAttentionRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverClrExecutionTime.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCursorCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCursorMemoryUsage.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCursorPlanCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCursorRequestRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverParameterizationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverPlanExecutionRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverRecompilationRatio.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverStoredProcedureInvocationRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTableCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTaskCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTaskRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionDelay.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogFlushDataRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogFlushRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogFlushWaitRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogGrowthCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogShrinkCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionLogUsage.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionMirrorWriteRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverTransactionWriteRate.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverUserConnectionCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverHostMemoryLimit.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverHostMemoryUsage.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverWorkerRequestCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverWorkerThreadCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverWorktableCacheHitRatio.Enabled = enabled
 
-	cfg.Events.DbServerTopQuery.Enabled = enabled
-	cfg.Events.DbServerQuerySample.Enabled = enabled
-	cfg.Metrics.SqlserverCPUCount.Enabled = enabled
-	cfg.Metrics.SqlserverComputerUptime.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverAvailabilityGroupDatabaseReplicaSecondaryLag.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverAvailabilityGroupDatabaseReplicaQueueSize.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverAvailabilityGroupDatabaseReplicaQueueRate.Enabled = enabled
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = enabled
+	cfg.LogsBuilderConfig.Events.DbServerQuerySample.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCPUCount.Enabled = enabled
+	cfg.MetricsBuilderConfig.Metrics.SqlserverComputerUptime.Enabled = enabled
 	// cfg.TopQueryCollection.Enabled = enabled
 	// cfg.QuerySample.Enabled = enabled
 }
@@ -94,6 +148,8 @@ func enableSQLServerResourceAttributesForTests(resourceAttributes *metadata.Reso
 	resourceAttributes.SqlserverInstanceName.Enabled = true
 	resourceAttributes.ServerAddress.Enabled = true
 	resourceAttributes.ServerPort.Enabled = true
+	resourceAttributes.ServiceName.Enabled = true
+	resourceAttributes.ServiceNamespace.Enabled = true
 }
 
 func TestEmptyScrape(t *testing.T) {
@@ -110,7 +166,7 @@ func TestEmptyScrape(t *testing.T) {
 	// Disable all metrics manually that are enabled by default
 	configureAllScraperMetricsAndEvents(cfg, false)
 
-	scrapers := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.Empty(t, scrapers)
 }
 
@@ -118,6 +174,9 @@ func TestSuccessfulScrape(t *testing.T) {
 	tests := []struct {
 		removeServerResourceAttributeFeatureGate bool
 		name                                     string
+		// propertiesFixtureFile overrides the fixture returned for the server properties
+		// query. Empty means the default on-prem fixture (propertyQueryData.txt).
+		propertiesFixtureFile string
 	}{
 		{
 			name:                                     "TestSuccessfulScrape with removing server resource attribute feature gate on",
@@ -126,6 +185,15 @@ func TestSuccessfulScrape(t *testing.T) {
 		{
 			name:                                     "TestSuccessfulScrape with removing server resource attribute feature gate off",
 			removeServerResourceAttributeFeatureGate: false,
+		},
+		{
+			// Azure SQL Managed Instance (EngineEdition 8) returns a reduced property column
+			// set: the host/registry columns (service_name, instance_type, ForceEncryption,
+			// Port, PortType, hardware_type) are omitted, none of which the receiver consumes.
+			// The emitted metrics must therefore match the full on-prem golden file, guarding
+			// against a future change that reads a now-absent column without a nil guard.
+			name:                  "TestSuccessfulScrape with Azure SQL Managed Instance property columns",
+			propertiesFixtureFile: "propertyQueryDataManagedInstance.txt",
 		},
 	}
 
@@ -140,12 +208,18 @@ func TestSuccessfulScrape(t *testing.T) {
 			cfg.MetricsBuilderConfig.ResourceAttributes.SqlserverInstanceName.Enabled = true
 			cfg.MetricsBuilderConfig.ResourceAttributes.ServerAddress.Enabled = true
 			cfg.MetricsBuilderConfig.ResourceAttributes.ServerPort.Enabled = true
+			cfg.MetricsBuilderConfig.ResourceAttributes.ServiceName.Enabled = true
+			cfg.MetricsBuilderConfig.ResourceAttributes.ServiceNamespace.Enabled = true
+			cfg.LogsBuilderConfig.ResourceAttributes.ServiceName.Enabled = true
+			cfg.LogsBuilderConfig.ResourceAttributes.ServiceNamespace.Enabled = true
 			assert.NoError(t, cfg.Validate())
 
 			configureAllScraperMetricsAndEvents(cfg, true)
 
-			scrapers := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+			scrapers, provider := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 			assert.NotEmpty(t, scrapers)
+			// The receiver owns the shared pool; close it once the test is done.
+			t.Cleanup(func() { assert.NoError(t, provider.close()) })
 
 			for _, scraper := range scrapers {
 				err := scraper.Start(t.Context(), componenttest.NewNopHost())
@@ -153,10 +227,11 @@ func TestSuccessfulScrape(t *testing.T) {
 				defer assert.NoError(t, scraper.Shutdown(t.Context()))
 
 				scraper.client = mockClient{
-					instanceName:        scraper.config.InstanceName,
-					SQL:                 scraper.sqlQuery,
-					maxQuerySampleCount: 1000,
-					lookbackTime:        20,
+					instanceName:          scraper.config.InstanceName,
+					SQL:                   scraper.sqlQuery,
+					maxQuerySampleCount:   1000,
+					lookbackTime:          20,
+					propertiesFixtureFile: test.propertiesFixtureFile,
 				}
 
 				actualMetrics, err := scraper.ScrapeMetrics(t.Context())
@@ -167,6 +242,8 @@ func TestSuccessfulScrape(t *testing.T) {
 				}
 				var expectedFile string
 				switch scraper.sqlQuery {
+				case getSQLServerAvailabilityGroupQuery(scraper.config.InstanceName):
+					expectedFile = filepath.Join("testdata", "expectedAvailabilityGroupMetrics")
 				case getSQLServerDatabaseIOQuery(scraper.config.InstanceName):
 					expectedFile = filepath.Join("testdata", "expectedDatabaseIO")
 				case getSQLServerPerformanceCounterQuery(scraper.config.InstanceName):
@@ -175,6 +252,14 @@ func TestSuccessfulScrape(t *testing.T) {
 					expectedFile = filepath.Join("testdata", "expectedProperties")
 				case getSQLServerWaitStatsQuery(scraper.config.InstanceName):
 					expectedFile = filepath.Join("testdata", "expectedWaitStats")
+				case getSQLServerIndexPhysicalStatsQuery(scraper.config.InstanceName):
+					expectedFile = filepath.Join("testdata", "expectedIndexPhysicalMetrics")
+				case getSQLServerWorkerThreadsQuery(scraper.config.InstanceName):
+					expectedFile = filepath.Join("testdata", "expectedWorkerThreads")
+				case getSQLServerCPUMemoryQuery(scraper.config.InstanceName):
+					expectedFile = filepath.Join("testdata", "expectedCPUMemory")
+				case getSQLServerDiskIOQuery(scraper.config.InstanceName):
+					expectedFile = filepath.Join("testdata", "expectedDiskIO")
 				}
 				expectedFile += fileSuffix
 
@@ -205,8 +290,10 @@ func TestScrapeInvalidQuery(t *testing.T) {
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, true)
-	scrapers := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, provider := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
+	// The receiver owns the shared pool; close it once the test is done.
+	t.Cleanup(func() { assert.NoError(t, provider.close()) })
 
 	for _, scraper := range scrapers {
 		err := scraper.Start(t.Context(), componenttest.NewNopHost())
@@ -231,13 +318,13 @@ func TestScrapeCacheAndDiff(t *testing.T) {
 	cfg.Port = 1433
 	cfg.Server = "0.0.0.0"
 	cfg.MetricsBuilderConfig.ResourceAttributes.SqlserverInstanceName.Enabled = true
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
 
-	cfg.Events.DbServerTopQuery.Enabled = true
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
@@ -267,17 +354,20 @@ func TestSortRows(t *testing.T) {
 	assert.Equal(
 		t,
 		[]sqlquery.StringMap{{"ghi": "56"}, {"def": "34"}, {"abc": "12"}},
-		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 3))
+		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 3),
+	)
 
 	assert.Equal(
 		t,
 		[]sqlquery.StringMap{{"ghi": "56"}, {"def": "34"}},
-		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 2))
+		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 2),
+	)
 
 	assert.Equal(
 		t,
 		[]sqlquery.StringMap{{"ghi": "56"}},
-		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 1))
+		sortRows([]sqlquery.StringMap{{"abc": "12"}, {"ghi": "56"}, {"def": "34"}}, []int64{1, 2, 2}, 1),
+	)
 
 	weights := make([]int64, 50)
 
@@ -315,6 +405,10 @@ type mockClient struct {
 	lookbackTime        uint
 	topQueryCount       uint
 	maxRowsPerQuery     uint64
+	// propertiesFixtureFile, when set, overrides the fixture returned for the
+	// server properties query. Used to exercise the reduced Azure SQL Managed
+	// Instance column shape.
+	propertiesFixtureFile string
 }
 
 type mockInvalidClient struct {
@@ -340,19 +434,90 @@ func readFile(fname string) ([]sqlquery.StringMap, error) {
 	return metrics, nil
 }
 
+func TestParseWaitResource(t *testing.T) {
+	testCases := map[string]struct {
+		input        string
+		expectedType string
+		expectedID   string
+	}{
+		"empty": {
+			input:        "",
+			expectedType: "",
+			expectedID:   "",
+		},
+		"invalid": {
+			input:        "not-a-wait-resource",
+			expectedType: "",
+			expectedID:   "",
+		},
+		"key": {
+			input:        "KEY: 5:72057594043359232 (abc)",
+			expectedType: "KEY",
+			expectedID:   "72057594043359232",
+		},
+		"page": {
+			input:        "PAGE: 7:1:232",
+			expectedType: "PAGE",
+			expectedID:   "1:232",
+		},
+		"rid": {
+			input:        "RID: 7:1:232:3",
+			expectedType: "RID",
+			expectedID:   "1:232:3",
+		},
+		"object": {
+			input:        "OBJECT: 9:245575913:0",
+			expectedType: "OBJECT",
+			expectedID:   "245575913:0",
+		},
+		"database": {
+			input:        "DATABASE: 5",
+			expectedType: "DATABASE",
+			expectedID:   "5",
+		},
+		"file": {
+			input:        "FILE: 5:2",
+			expectedType: "FILE",
+			expectedID:   "2",
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			resourceType, resourceID := parseWaitResource(tc.input)
+			assert.Equal(t, tc.expectedType, resourceType)
+			assert.Equal(t, tc.expectedID, resourceID)
+		})
+	}
+}
+
 func (mc mockClient) QueryRows(context.Context, ...any) ([]sqlquery.StringMap, error) {
 	var queryResults []sqlquery.StringMap
 	var err error
 
 	switch mc.SQL {
+	case getSQLServerAvailabilityGroupQuery(mc.instanceName):
+		queryResults, err = readFile("availabilityGroupQueryData.txt")
 	case getSQLServerDatabaseIOQuery(mc.instanceName):
 		queryResults, err = readFile("database_io_scraped_data.txt")
 	case getSQLServerPerformanceCounterQuery(mc.instanceName):
 		queryResults, err = readFile("perfCounterQueryData.txt")
 	case getSQLServerPropertiesQuery(mc.instanceName):
-		queryResults, err = readFile("propertyQueryData.txt")
+		fixture := "propertyQueryData.txt"
+		if mc.propertiesFixtureFile != "" {
+			fixture = mc.propertiesFixtureFile
+		}
+		queryResults, err = readFile(fixture)
 	case getSQLServerWaitStatsQuery(mc.instanceName):
 		queryResults, err = readFile("waitStatsQueryData.txt")
+	case getSQLServerWorkerThreadsQuery(mc.instanceName):
+		queryResults, err = readFile("workerThreadsQueryData.txt")
+	case getSQLServerIndexPhysicalStatsQuery(mc.instanceName):
+		queryResults, err = readFile("indexPhysicalQueryData.txt")
+	case getSQLServerCPUMemoryQuery(mc.instanceName):
+		queryResults, err = readFile("cpuMemoryQueryData.txt")
+	case getSQLServerDiskIOQuery(mc.instanceName):
+		queryResults, err = readFile("diskIOQueryData.txt")
 	case getSQLServerQueryTextAndPlanQuery():
 		queryResults, err = readFile("queryTextAndPlanQueryData.txt")
 	case getSQLServerQuerySamplesQuery():
@@ -402,14 +567,14 @@ func TestQueryTextAndPlanQueryMetricsShouldBeCachedSinceFirstCollection(t *testi
 	cfg.Port = 1433
 	cfg.Server = "0.0.0.0"
 	enableSQLServerResourceAttributesForTests(&cfg.LogsBuilderConfig.ResourceAttributes)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	cfg.TopQueryCollection.CollectionInterval = cfg.ControllerConfig.CollectionInterval
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
@@ -482,14 +647,14 @@ func TestQueryTextAndPlanQuery(t *testing.T) {
 	cfg.Port = 1433
 	cfg.Server = "0.0.0.0"
 	enableSQLServerResourceAttributesForTests(&cfg.LogsBuilderConfig.ResourceAttributes)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	cfg.TopQueryCollection.CollectionInterval = cfg.ControllerConfig.CollectionInterval
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
@@ -545,13 +710,13 @@ func TestInvalidQueryTextAndPlanQuery(t *testing.T) {
 	cfg.Password = "password"
 	cfg.Port = 1433
 	cfg.Server = "0.0.0.0"
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
@@ -638,9 +803,9 @@ func TestRecordDatabaseSampleQuery(t *testing.T) {
 			assert.NoError(t, cfg.Validate())
 
 			configureAllScraperMetricsAndEvents(cfg, false)
-			cfg.Events.DbServerQuerySample.Enabled = true
+			cfg.LogsBuilderConfig.Events.DbServerQuerySample.Enabled = true
 
-			scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+			scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 			assert.NotNil(t, scrapers)
 
 			scraper := scrapers[0]
@@ -655,15 +820,223 @@ func TestRecordDatabaseSampleQuery(t *testing.T) {
 				assert.NoError(t, err)
 			}
 
+			logRecord := actualLogs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0)
+			blockingSessionIDAttr, ok := logRecord.Attributes().Get("sqlserver.blocking_session_id")
+			assert.True(t, ok)
+			blockingStartTimeAttr, hasBlockingStartTime := logRecord.Attributes().Get("sqlserver.blocking.start_time")
+			assert.Equal(t, blockingSessionIDAttr.Int() > 0, hasBlockingStartTime)
+			if hasBlockingStartTime {
+				_, parseErr := time.Parse(time.RFC3339, blockingStartTimeAttr.Str())
+				assert.NoError(t, parseErr)
+			}
+
 			// Uncomment line below to re-generate expected logs.
 			// golden.WriteLogs(t, filepath.Join("testdata", tc.expectedFile), actualLogs)
 			expectedLogs, err := golden.ReadLogs(filepath.Join("testdata", tc.expectedFile))
 			assert.NoError(t, err)
+			removeAttributeFromAllLogRecords(expectedLogs, "sqlserver.blocking.start_time")
+			removeAttributeFromAllLogRecords(actualLogs, "sqlserver.blocking.start_time")
 			errs := plogtest.CompareLogs(expectedLogs, actualLogs, plogtest.IgnoreTimestamp())
-			assert.Equal(t, "db.server.query_sample", actualLogs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords().At(0).EventName())
+			assert.Equal(t, "db.server.query_sample", logRecord.EventName())
 			assert.NoError(t, errs)
 		})
 	}
+}
+
+func removeAttributeFromAllLogRecords(logs plog.Logs, key string) {
+	resourceLogs := logs.ResourceLogs()
+	for i := 0; i < resourceLogs.Len(); i++ {
+		scopeLogs := resourceLogs.At(i).ScopeLogs()
+		for j := 0; j < scopeLogs.Len(); j++ {
+			logRecords := scopeLogs.At(j).LogRecords()
+			for k := 0; k < logRecords.Len(); k++ {
+				logRecords.At(k).Attributes().Remove(key)
+			}
+		}
+	}
+}
+
+type queryRowsFuncClient struct {
+	queryRowsFunc func(context.Context, ...any) ([]sqlquery.StringMap, error)
+}
+
+func (c queryRowsFuncClient) QueryRows(ctx context.Context, args ...any) ([]sqlquery.StringMap, error) {
+	return c.queryRowsFunc(ctx, args...)
+}
+
+func setupQuerySampleScraper(t *testing.T, logger *zap.Logger) *sqlServerScraperHelper {
+	t.Helper()
+
+	cfg := createDefaultConfig().(*Config)
+	cfg.Username = "sa"
+	cfg.Password = "password"
+	cfg.Port = 1433
+	cfg.Server = "0.0.0.0"
+	enableSQLServerResourceAttributesForTests(&cfg.LogsBuilderConfig.ResourceAttributes)
+	configureAllScraperMetricsAndEvents(cfg, false)
+	cfg.LogsBuilderConfig.Events.DbServerQuerySample.Enabled = true
+	assert.NoError(t, cfg.Validate())
+
+	settings := receivertest.NewNopSettings(metadata.Type)
+	if logger != nil {
+		settings.Logger = logger
+	}
+
+	scrapers, _ := setupSQLServerLogsScrapers(settings, cfg)
+	assert.Len(t, scrapers, 1)
+	return scrapers[0]
+}
+
+func buildQuerySampleRow(sessionID, blockingSessionID, command, statement string) sqlquery.StringMap {
+	return sqlquery.StringMap{
+		"sql_instance":                "sqlserver",
+		"computer_name":               "DESKTOP-GHAEGRD",
+		"db_name":                     "master",
+		"client_address":              "172.19.0.1",
+		"client_port":                 "59286",
+		"query_start":                 "2025-02-12T16:37:54.843+08:00",
+		"session_id":                  sessionID,
+		"session_status":              "running",
+		"request_status":              "running",
+		"host_name":                   "DESKTOP-GHAEGRD",
+		"command":                     command,
+		"statement_text":              statement,
+		"blocking_session_id":         blockingSessionID,
+		"wait_type":                   "",
+		"wait_time":                   "0",
+		"wait_resource":               "",
+		"open_transaction_count":      "0",
+		"transaction_id":              "11089",
+		"percent_complete":            "0",
+		"estimated_completion_time":   "0",
+		"cpu_time":                    "6",
+		"total_elapsed_time":          "6",
+		"reads":                       "0",
+		"writes":                      "0",
+		"logical_reads":               "38",
+		"transaction_isolation_level": "2",
+		"lock_timeout":                "-1",
+		"deadlock_priority":           "0",
+		"row_count":                   "1",
+		"query_hash":                  "0x70A3B130B1048D4D",
+		"query_plan_hash":             "0x140210F64B788CB9",
+		"context_info":                "",
+		"username":                    "sa",
+		"client_app_name":             "SSMS",
+		"session_start_time":          "2025-02-12T15:00:00.000+08:00",
+		"session_duration":            "720456",
+		"procedure_id":                "0",
+		"procedure_name":              "",
+		"blocking_start_time":         "",
+	}
+}
+
+func buildIdleBlockerRow(sessionID string) sqlquery.StringMap {
+	row := buildQuerySampleRow(sessionID, "0", "IDLE_BLOCKER", "SELECT 1")
+	row["session_status"] = "sleeping"
+	row["request_status"] = ""
+	return row
+}
+
+func TestRecordDatabaseSampleQueryFetchesIdleBlockers(t *testing.T) {
+	scraper := setupQuerySampleScraper(t, nil)
+	scraper.db = &sql.DB{}
+
+	mainRows := []sqlquery.StringMap{buildQuerySampleRow("60", "77", "SELECT", "SELECT 2")}
+	idleRows := []sqlquery.StringMap{buildIdleBlockerRow("77")}
+
+	idleQueryCalls := 0
+	scraper.client = queryRowsFuncClient{queryRowsFunc: func(context.Context, ...any) ([]sqlquery.StringMap, error) {
+		return mainRows, nil
+	}}
+	scraper.clientProviderFunc = func(_ sqlquery.Db, query string, _ *zap.Logger, _ sqlquery.TelemetryConfig) sqlquery.DbClient {
+		expectedQuery := fmt.Sprintf(getSQLServerIdleBlockingSessionsQuery(), "77")
+		assert.Equal(t, expectedQuery, query)
+		return queryRowsFuncClient{queryRowsFunc: func(_ context.Context, args ...any) ([]sqlquery.StringMap, error) {
+			idleQueryCalls++
+			assert.Equal(t, []any{
+				sql.Named("top", scraper.config.QuerySample.MaxRowsPerQuery),
+			}, args)
+			return idleRows, nil
+		}}
+	}
+
+	actualLogs, err := scraper.ScrapeLogs(t.Context())
+	assert.NoError(t, err)
+	assert.Equal(t, 2, actualLogs.LogRecordCount())
+	assert.Equal(t, 1, idleQueryCalls)
+
+	foundIdleBlocker := false
+	records := actualLogs.ResourceLogs().At(0).ScopeLogs().At(0).LogRecords()
+	for i := 0; i < records.Len(); i++ {
+		attrs := records.At(i).Attributes()
+		command, ok := attrs.Get("sqlserver.command")
+		if ok && command.Str() == "IDLE_BLOCKER" {
+			foundIdleBlocker = true
+			sessionID, hasSessionID := attrs.Get("sqlserver.session_id")
+			assert.True(t, hasSessionID)
+			assert.Equal(t, int64(77), sessionID.Int())
+			_, hasBlockingStartTime := attrs.Get("sqlserver.blocking.start_time")
+			assert.False(t, hasBlockingStartTime)
+		}
+	}
+	assert.True(t, foundIdleBlocker)
+}
+
+func TestRecordDatabaseSampleQueryDoesNotFetchIdleBlockersWhenNoneMissing(t *testing.T) {
+	scraper := setupQuerySampleScraper(t, nil)
+	scraper.db = &sql.DB{}
+
+	mainRows := []sqlquery.StringMap{
+		buildQuerySampleRow("60", "61", "SELECT", "SELECT 2"),
+		buildQuerySampleRow("61", "0", "SELECT", "SELECT 3"),
+	}
+
+	providerCalls := 0
+	scraper.client = queryRowsFuncClient{queryRowsFunc: func(context.Context, ...any) ([]sqlquery.StringMap, error) {
+		return mainRows, nil
+	}}
+	scraper.clientProviderFunc = func(_ sqlquery.Db, _ string, _ *zap.Logger, _ sqlquery.TelemetryConfig) sqlquery.DbClient {
+		providerCalls++
+		return queryRowsFuncClient{queryRowsFunc: func(context.Context, ...any) ([]sqlquery.StringMap, error) {
+			return nil, nil
+		}}
+	}
+
+	actualLogs, err := scraper.ScrapeLogs(t.Context())
+	assert.NoError(t, err)
+	assert.Equal(t, 2, actualLogs.LogRecordCount())
+	assert.Equal(t, 0, providerCalls)
+}
+
+func TestRecordDatabaseSampleQueryIdleBlockerQueryFailureDoesNotFailScrape(t *testing.T) {
+	core, observedLogs := observer.New(zap.WarnLevel)
+	scraper := setupQuerySampleScraper(t, zap.New(core))
+	scraper.db = &sql.DB{}
+
+	mainRows := []sqlquery.StringMap{buildQuerySampleRow("60", "77", "SELECT", "SELECT 2")}
+
+	idleQueryCalls := 0
+	scraper.client = queryRowsFuncClient{queryRowsFunc: func(context.Context, ...any) ([]sqlquery.StringMap, error) {
+		return mainRows, nil
+	}}
+	scraper.clientProviderFunc = func(_ sqlquery.Db, query string, _ *zap.Logger, _ sqlquery.TelemetryConfig) sqlquery.DbClient {
+		expectedQuery := fmt.Sprintf(getSQLServerIdleBlockingSessionsQuery(), "77")
+		assert.Equal(t, expectedQuery, query)
+		return queryRowsFuncClient{queryRowsFunc: func(_ context.Context, args ...any) ([]sqlquery.StringMap, error) {
+			idleQueryCalls++
+			assert.Equal(t, []any{
+				sql.Named("top", scraper.config.QuerySample.MaxRowsPerQuery),
+			}, args)
+			return nil, errors.New("idle blocker query failed")
+		}}
+	}
+
+	actualLogs, err := scraper.ScrapeLogs(t.Context())
+	assert.NoError(t, err)
+	assert.Equal(t, 1, actualLogs.LogRecordCount())
+	assert.Equal(t, 1, idleQueryCalls)
+	assert.Equal(t, 1, observedLogs.FilterMessageSnippet("problems encountered getting idle blocker log rows").Len())
 }
 
 // TestMultiStatementProcNoDuplicateRows validates that a stored procedure
@@ -678,14 +1051,14 @@ func TestMultiStatementProcNoDuplicateRows(t *testing.T) {
 	cfg.Port = 1433
 	cfg.Server = "0.0.0.0"
 	cfg.MetricsBuilderConfig.ResourceAttributes.SqlserverInstanceName.Enabled = true
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	cfg.TopQueryCollection.CollectionInterval = cfg.ControllerConfig.CollectionInterval
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.NotNil(t, scrapers)
 
 	scraper := scrapers[0]
@@ -823,13 +1196,13 @@ func TestRecordDatabaseSampleQueryUsesResourceBuilderForLogs(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.DataSource = "sqlserver://testuser:testpass@datasource-host.example.com:1434?database=testdb"
 	enableSQLServerResourceAttributesForTests(&cfg.LogsBuilderConfig.ResourceAttributes)
-	cfg.Events.DbServerQuerySample.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerQuerySample.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerQuerySample.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerQuerySample.Enabled = true
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.Len(t, scrapers, 1)
 
 	scraper := scrapers[0]
@@ -865,14 +1238,14 @@ func TestRecordDatabaseQueryTextAndPlanUsesResourceBuilderForLogs(t *testing.T) 
 	cfg := createDefaultConfig().(*Config)
 	cfg.DataSource = "sqlserver://testuser:testpass@datasource-host.example.com:1434?database=testdb"
 	enableSQLServerResourceAttributesForTests(&cfg.LogsBuilderConfig.ResourceAttributes)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Events.DbServerTopQuery.Enabled = true
+	cfg.LogsBuilderConfig.Events.DbServerTopQuery.Enabled = true
 	cfg.TopQueryCollection.CollectionInterval = cfg.ControllerConfig.CollectionInterval
 
-	scrapers := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerLogsScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.Len(t, scrapers, 1)
 
 	scraper := scrapers[0]
@@ -935,17 +1308,89 @@ func TestRecordDatabaseQueryTextAndPlanUsesResourceBuilderForLogs(t *testing.T) 
 	assert.Equal(t, int64(1434), serverPort.Int())
 }
 
+func TestRecordWorkerThreadMetrics(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Username = "sa"
+	cfg.Password = "password"
+	cfg.Server = "0.0.0.0"
+	cfg.Port = 1433
+	assert.NoError(t, cfg.Validate())
+	cfg.MetricsBuilderConfig.Metrics.SqlserverWorkerThreadCount.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverWorkerRequestCount.Enabled = true
+
+	scrapers, provider := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	assert.NotEmpty(t, scrapers)
+
+	var workerScraper *sqlServerScraperHelper
+	for _, s := range scrapers {
+		if s.sqlQuery == getSQLServerWorkerThreadsQuery(cfg.InstanceName) {
+			workerScraper = s
+			break
+		}
+	}
+	assert.NotNil(t, workerScraper, "worker threads scraper should be present")
+
+	err := workerScraper.Start(t.Context(), componenttest.NewNopHost())
+	assert.NoError(t, err)
+	defer func() {
+		assert.NoError(t, workerScraper.Shutdown(t.Context()))
+		// The receiver owns the shared pool; close it here in the test.
+		assert.NoError(t, provider.close())
+	}()
+
+	workerScraper.client = mockClient{
+		instanceName: workerScraper.config.InstanceName,
+		SQL:          workerScraper.sqlQuery,
+	}
+
+	actualMetrics, err := workerScraper.ScrapeMetrics(t.Context())
+	assert.NoError(t, err)
+
+	// Verify all five data points: 4 worker.state variants + 1 worker.request.waiting
+	var totalDP int
+	for i := 0; i < actualMetrics.ResourceMetrics().Len(); i++ {
+		rm := actualMetrics.ResourceMetrics().At(i)
+		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+			sm := rm.ScopeMetrics().At(j)
+			for k := 0; k < sm.Metrics().Len(); k++ {
+				m := sm.Metrics().At(k)
+				switch m.Name() {
+				case metadata.MetricsInfo.SqlserverWorkerThreadCount.Name:
+					totalDP += m.Gauge().DataPoints().Len()
+				case metadata.MetricsInfo.SqlserverWorkerRequestCount.Name:
+					totalDP += m.Gauge().DataPoints().Len()
+				}
+			}
+		}
+	}
+	assert.Equal(t, 5, totalDP)
+}
+
+func TestIsWorkerThreadsQueryEnabled(t *testing.T) {
+	assert.False(t, isWorkerThreadsQueryEnabled(nil))
+
+	metrics := &metadata.MetricsConfig{}
+	assert.False(t, isWorkerThreadsQueryEnabled(metrics))
+
+	metrics.SqlserverWorkerThreadCount.Enabled = true
+	assert.True(t, isWorkerThreadsQueryEnabled(metrics))
+
+	metrics.SqlserverWorkerThreadCount.Enabled = false
+	metrics.SqlserverWorkerRequestCount.Enabled = true
+	assert.True(t, isWorkerThreadsQueryEnabled(metrics))
+}
+
 func TestRecordDatabaseStatusMetricsUsesResourceBuilderForMetrics(t *testing.T) {
 	cfg := createDefaultConfig().(*Config)
 	cfg.DataSource = "sqlserver://testuser:testpass@datasource-host.example.com:1434?database=testdb"
 	enableSQLServerResourceAttributesForTests(&cfg.MetricsBuilderConfig.ResourceAttributes)
-	cfg.Metrics.SqlserverCPUCount.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCPUCount.Enabled = true
 	assert.NoError(t, cfg.Validate())
 
 	configureAllScraperMetricsAndEvents(cfg, false)
-	cfg.Metrics.SqlserverCPUCount.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCPUCount.Enabled = true
 
-	scrapers := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	scrapers, _ := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
 	assert.Len(t, scrapers, 1)
 
 	scraper := scrapers[0]
@@ -982,4 +1427,181 @@ func TestRecordDatabaseStatusMetricsUsesResourceBuilderForMetrics(t *testing.T) 
 	serverPort, exists := resourceAttributes.Get("server.port")
 	assert.True(t, exists)
 	assert.Equal(t, int64(1434), serverPort.Int())
+}
+
+func TestRecordCPUMemoryMetrics(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Username = "sa"
+	cfg.Password = "password"
+	cfg.Server = "0.0.0.0"
+	cfg.Port = 1433
+	assert.NoError(t, cfg.Validate())
+	cfg.MetricsBuilderConfig.Metrics.SqlserverCPUUtilization.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverHostMemoryLimit.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverHostMemoryUsage.Enabled = true
+
+	scrapers, provider := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	assert.NotEmpty(t, scrapers)
+	defer func() { assert.NoError(t, provider.close()) }()
+
+	var cpuMemScraper *sqlServerScraperHelper
+	for _, s := range scrapers {
+		if s.sqlQuery == getSQLServerCPUMemoryQuery(cfg.InstanceName) {
+			cpuMemScraper = s
+			break
+		}
+	}
+	assert.NotNil(t, cpuMemScraper, "cpu memory scraper should be present")
+
+	err := cpuMemScraper.Start(t.Context(), componenttest.NewNopHost())
+	assert.NoError(t, err)
+	defer assert.NoError(t, cpuMemScraper.Shutdown(t.Context()))
+
+	cpuMemScraper.client = mockClient{
+		instanceName: cpuMemScraper.config.InstanceName,
+		SQL:          cpuMemScraper.sqlQuery,
+	}
+
+	actualMetrics, err := cpuMemScraper.ScrapeMetrics(t.Context())
+	assert.NoError(t, err)
+
+	// Verify 4 data points: 1 cpu utilization + 1 memory limit + 2 memory usage (used, free)
+	var totalDP int
+	var cpuVal, limitVal, usedVal, freeVal float64
+	var sawCPU, sawLimit, sawUsed, sawFree bool
+	for i := 0; i < actualMetrics.ResourceMetrics().Len(); i++ {
+		rm := actualMetrics.ResourceMetrics().At(i)
+		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+			sm := rm.ScopeMetrics().At(j)
+			for k := 0; k < sm.Metrics().Len(); k++ {
+				m := sm.Metrics().At(k)
+				switch m.Name() {
+				case metadata.MetricsInfo.SqlserverCPUUtilization.Name:
+					dps := m.Gauge().DataPoints()
+					totalDP += dps.Len()
+					for d := 0; d < dps.Len(); d++ {
+						cpuVal = dps.At(d).DoubleValue()
+						sawCPU = true
+					}
+				case metadata.MetricsInfo.SqlserverHostMemoryLimit.Name:
+					dps := m.Gauge().DataPoints()
+					totalDP += dps.Len()
+					for d := 0; d < dps.Len(); d++ {
+						limitVal = float64(dps.At(d).IntValue())
+						sawLimit = true
+					}
+				case metadata.MetricsInfo.SqlserverHostMemoryUsage.Name:
+					dps := m.Gauge().DataPoints()
+					totalDP += dps.Len()
+					for d := 0; d < dps.Len(); d++ {
+						state, _ := dps.At(d).Attributes().Get("system.memory.state")
+						switch state.Str() {
+						case "used":
+							usedVal = float64(dps.At(d).IntValue())
+							sawUsed = true
+						case "free":
+							freeVal = float64(dps.At(d).IntValue())
+							sawFree = true
+						}
+					}
+				}
+			}
+		}
+	}
+	assert.Equal(t, 4, totalDP)
+	assert.True(t, sawCPU, "cpu utilization data point should be emitted")
+	assert.True(t, sawLimit, "host memory limit data point should be emitted")
+	assert.True(t, sawUsed, "host memory usage used data point should be emitted")
+	assert.True(t, sawFree, "host memory usage free data point should be emitted")
+	assert.InDelta(t, 0.425, cpuVal, 0.0001)
+	assert.Equal(t, float64(17179869184), limitVal)
+	assert.Equal(t, float64(8589934592), usedVal)
+	assert.Equal(t, float64(8589934592), freeVal)
+}
+
+func TestRecordDiskIOMetrics(t *testing.T) {
+	cfg := createDefaultConfig().(*Config)
+	cfg.Username = "sa"
+	cfg.Password = "password"
+	cfg.Server = "0.0.0.0"
+	cfg.Port = 1433
+	assert.NoError(t, cfg.Validate())
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDiskOperations.Enabled = true
+	cfg.MetricsBuilderConfig.Metrics.SqlserverDiskIo.Enabled = true
+
+	scrapers, provider := setupSQLServerScrapers(receivertest.NewNopSettings(metadata.Type), cfg)
+	assert.NotEmpty(t, scrapers)
+	defer func() { assert.NoError(t, provider.close()) }()
+
+	var diskScraper *sqlServerScraperHelper
+	for _, s := range scrapers {
+		if s.sqlQuery == getSQLServerDiskIOQuery(cfg.InstanceName) {
+			diskScraper = s
+			break
+		}
+	}
+	assert.NotNil(t, diskScraper, "disk io scraper should be present")
+
+	err := diskScraper.Start(t.Context(), componenttest.NewNopHost())
+	assert.NoError(t, err)
+	defer assert.NoError(t, diskScraper.Shutdown(t.Context()))
+
+	diskScraper.client = mockClient{
+		instanceName: diskScraper.config.InstanceName,
+		SQL:          diskScraper.sqlQuery,
+	}
+
+	actualMetrics, err := diskScraper.ScrapeMetrics(t.Context())
+	assert.NoError(t, err)
+
+	// 3 drives x (2 directions for operations + 2 directions for bytes) = 12 data points
+	var totalDP int
+	for i := 0; i < actualMetrics.ResourceMetrics().Len(); i++ {
+		rm := actualMetrics.ResourceMetrics().At(i)
+		for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+			sm := rm.ScopeMetrics().At(j)
+			for k := 0; k < sm.Metrics().Len(); k++ {
+				m := sm.Metrics().At(k)
+				switch m.Name() {
+				case metadata.MetricsInfo.SqlserverDiskOperations.Name:
+					totalDP += m.Sum().DataPoints().Len()
+				case metadata.MetricsInfo.SqlserverDiskIo.Name:
+					totalDP += m.Sum().DataPoints().Len()
+				}
+			}
+		}
+	}
+	assert.Equal(t, 12, totalDP)
+}
+
+func TestIsCPUMemoryQueryEnabled(t *testing.T) {
+	assert.False(t, isCPUMemoryQueryEnabled(nil))
+
+	metrics := &metadata.MetricsConfig{}
+	assert.False(t, isCPUMemoryQueryEnabled(metrics))
+
+	metrics.SqlserverCPUUtilization.Enabled = true
+	assert.True(t, isCPUMemoryQueryEnabled(metrics))
+
+	metrics.SqlserverCPUUtilization.Enabled = false
+	metrics.SqlserverHostMemoryLimit.Enabled = true
+	assert.True(t, isCPUMemoryQueryEnabled(metrics))
+
+	metrics.SqlserverHostMemoryLimit.Enabled = false
+	metrics.SqlserverHostMemoryUsage.Enabled = true
+	assert.True(t, isCPUMemoryQueryEnabled(metrics))
+}
+
+func TestIsDiskIOQueryEnabled(t *testing.T) {
+	assert.False(t, isDiskIOQueryEnabled(nil))
+
+	metrics := &metadata.MetricsConfig{}
+	assert.False(t, isDiskIOQueryEnabled(metrics))
+
+	metrics.SqlserverDiskOperations.Enabled = true
+	assert.True(t, isDiskIOQueryEnabled(metrics))
+
+	metrics.SqlserverDiskOperations.Enabled = false
+	metrics.SqlserverDiskIo.Enabled = true
+	assert.True(t, isDiskIOQueryEnabled(metrics))
 }

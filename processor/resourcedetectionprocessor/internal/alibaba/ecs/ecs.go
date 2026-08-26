@@ -8,7 +8,7 @@ import (
 
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/processor"
-	conventions "go.opentelemetry.io/otel/semconv/v1.39.0"
+	conventions "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.uber.org/zap"
 
 	ecsprovider "github.com/open-telemetry/opentelemetry-collector-contrib/internal/metadataproviders/alibaba/ecs"
@@ -32,14 +32,14 @@ type Detector struct {
 }
 
 // NewDetector creates an Alibaba Cloud ECS detector.
-func NewDetector(set processor.Settings, dcfg internal.DetectorConfig) (internal.Detector, error) {
+func NewDetector(set processor.Settings, dcfg internal.DetectorConfig, failOnMissingMetadata bool) (internal.Detector, error) {
 	cfg := dcfg.(Config)
 
 	return &Detector{
 		logger:                set.Logger,
 		rb:                    metadata.NewResourceBuilder(cfg.ResourceAttributes),
 		metadataProvider:      ecsprovider.NewProvider(),
-		failOnMissingMetadata: cfg.FailOnMissingMetadata,
+		failOnMissingMetadata: failOnMissingMetadata || cfg.FailOnMissingMetadata,
 	}, nil
 }
 

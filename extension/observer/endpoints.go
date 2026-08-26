@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 )
 
 type (
@@ -37,8 +38,6 @@ const (
 	HostPortType EndpointType = "hostport"
 	// ContainerType is a container endpoint.
 	ContainerType EndpointType = "container"
-	// KafkaTopicType is a kafka topic endpoint
-	KafkaTopicType EndpointType = "kafka.topics"
 )
 
 var (
@@ -49,7 +48,6 @@ var (
 	_ EndpointDetails = (*K8sCRD)(nil)
 	_ EndpointDetails = (*HostPort)(nil)
 	_ EndpointDetails = (*Container)(nil)
-	_ EndpointDetails = (*KafkaTopic)(nil)
 )
 
 // EndpointDetails provides additional context about an endpoint such as a Pod or Port.
@@ -288,6 +286,7 @@ func (h *HostPort) Env() EndpointEnv {
 		"is_ipv6":      h.IsIPv6,
 		"port":         h.Port,
 		"transport":    h.Transport,
+		"os":           runtime.GOOS,
 	}
 }
 
@@ -424,14 +423,4 @@ func (c *K8sCRD) Env() EndpointEnv {
 
 func (*K8sCRD) Type() EndpointType {
 	return K8sCRDType
-}
-
-type KafkaTopic struct{}
-
-func (*KafkaTopic) Env() EndpointEnv {
-	return map[string]any{}
-}
-
-func (*KafkaTopic) Type() EndpointType {
-	return KafkaTopicType
 }

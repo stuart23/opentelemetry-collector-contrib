@@ -16,10 +16,10 @@ Count of the completed bulk requests.
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` |
-| http.response.status_code | HTTP status code. | Any Int |
+| Name | Description | Values | Semantic Convention |
+| ---- | ----------- | ------ | ------------------- |
+| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` | - |
+| http.response.status_code | HTTP status code. | Any Int | - |
 
 ### otelcol.elasticsearch.bulk_requests.latency
 
@@ -31,10 +31,10 @@ Latency of Elasticsearch bulk operations in seconds.
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` |
-| http.response.status_code | HTTP status code. | Any Int |
+| Name | Description | Values | Semantic Convention |
+| ---- | ----------- | ------ | ------------------- |
+| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` | - |
+| http.response.status_code | HTTP status code. | Any Int | - |
 
 ### otelcol.elasticsearch.docs.processed
 
@@ -46,12 +46,12 @@ Count of documents flushed to Elasticsearch.
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` |
-| http.response.status_code | HTTP status code. | Any Int |
-| failure_store | The status of the failure store. | Str: ``unknown``, ``not_enabled``, ``used``, ``failed`` |
-| error.type | The type of error that occurred when processing the documents. | Any Str |
+| Name | Description | Values | Semantic Convention |
+| ---- | ----------- | ------ | ------------------- |
+| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` | - |
+| http.response.status_code | HTTP status code. | Any Int | - |
+| failure_store | The status of the failure store. | Str: ``unknown``, ``not_enabled``, ``used``, ``failed`` | - |
+| error.type | The type of error that occurred when processing the documents. | Any Str | - |
 
 ### otelcol.elasticsearch.docs.received
 
@@ -84,17 +84,16 @@ In contrast, `elasticsearch.docs.retried` counts documents retried
 individually within otherwise successful bulk requests due to
 document-specific failures such as mapping conflicts.
 
-
 | Unit | Metric Type | Value Type | Monotonic | Stability |
 | ---- | ----------- | ---------- | --------- | --------- |
 | 1 | Sum | Int | true | Alpha |
 
 #### Attributes
 
-| Name | Description | Values |
-| ---- | ----------- | ------ |
-| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` |
-| http.response.status_code | HTTP status code. | Any Int |
+| Name | Description | Values | Semantic Convention |
+| ---- | ----------- | ------ | ------------------- |
+| outcome | The operation outcome. | Str: ``success``, ``failed_client``, ``failed_server``, ``timeout``, ``too_many``, ``failure_store``, ``internal_server_error`` | - |
+| http.response.status_code | HTTP status code. | Any Int | - |
 
 ### otelcol.elasticsearch.flushed.bytes
 

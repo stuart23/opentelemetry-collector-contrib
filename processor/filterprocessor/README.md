@@ -34,7 +34,7 @@ If **any** condition is met, the telemetry is dropped (each condition is ORed to
 
 ```yaml
 filter:
-  error_mode: propagate
+  error_mode: ignore
   <trace|metric|log|profile>_conditions: []
 ```
 
@@ -95,13 +95,21 @@ This condition translates to: For each span event, check whether its parent span
 
 ### Error Modes
 
-The filter processor also allows configuring an optional field, `error_mode`, which will determine how the processor reacts to errors that occur while processing an OTTL condition. `propagate` is the default mode.
+The filter processor also allows configuring an optional field, `error_mode`, which will determine how the processor reacts to errors that occur while processing an OTTL condition. `ignore` is the default mode.
 
 | error_mode | description                                                                                                                            |
 |------------|----------------------------------------------------------------------------------------------------------------------------------------|
 | ignore     | The processor ignores errors returned by conditions, logs them, and continues on to the next condition.  This is the recommended mode. |
 | silent     | The processor ignores errors returned by conditions, does not log them, and continues on to the next condition.                        |
 | propagate  | The processor returns the error up the pipeline.  This will result in the payload being dropped from the collector.                    |
+
+#### Feature Gate
+
+##### `processor.filter.defaultErrorModeIgnore`
+
+The `processor.filter.defaultErrorModeIgnore` [feature gate](https://github.com/open-telemetry/opentelemetry-collector/blob/main/featuregate/README.md#collector-feature-gates) changes the default `error_mode` of the filter processor from `propagate` to `ignore`.
+This gate is currently in `stable` (always enabled). The default `error_mode` is `ignore` and can no longer be reverted via this gate.
+The gate will be removed in v0.159.0.
 
 ### Basic Config
 
@@ -391,7 +399,7 @@ view into how OTTL views the underlying data.
 
 ```yaml
 receivers:
-  filelog:
+  file_log:
     start_at: beginning
     include: [ /Users/tylerhelmuth/projects/opentelemetry-collector-contrib/local/test.log ]
 
@@ -412,7 +420,7 @@ service:
   pipelines:
     logs:
       receivers:
-        - filelog
+        - file_log
       processors:
         - filter
       exporters:
@@ -429,3 +437,17 @@ In general, understand your data before using the filter processor.
 
 - When using the Filter Processor make sure you understand the look of your incoming data and test the configuration thoroughly. In general, use as specific a configuration as possible to lower the risk of the wrong data being dropped.
 - [Orphaned Telemetry](https://github.com/open-telemetry/opentelemetry-collector/blob/main/docs/standard-warnings.md#orphaned-telemetry): The processor allows dropping spans. Dropping a span may lead to orphaned spans if the dropped span is a parent. Dropping a span may lead to orphaned logs if the log references the dropped span.
+
+## Available Benchmarks
+
+The filter processor is tested as part of the project's load tests, with the results being
+publicly available on the benchmarks
+[page](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests).
+There you can find the CPU and memory usage of the processor evaluating a representative set of OTTL
+conditions against each signal at 10,000 items/second:
+
+- Traces: [CPU](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessortraces-cpu-percentage) and [memory](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessortraces-ram-mib)
+- Metrics: [CPU](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessormetrics-cpu-percentage) and [memory](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessormetrics-ram-mib)
+- Logs: [CPU](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessorlogs-cpu-percentage) and [memory](https://open-telemetry.github.io/opentelemetry-collector-contrib/benchmarks/loadtests/#filterprocessorlogs-ram-mib)
+
+Refer to the [test](https://github.com/open-telemetry/opentelemetry-collector-contrib/blob/main/testbed/tests/filter_processor_test.go) for more information about the setup.

@@ -92,7 +92,8 @@ var MapAttributeStatus = map[string]AttributeStatus{
 
 var MetricsInfo = metricsInfo{
 	SystemProcessesCount: metricInfo{
-		Name: "system.processes.count",
+		Name:       "system.processes.count",
+		Attributes: []string{"status"},
 	},
 	SystemProcessesCreated: metricInfo{
 		Name: "system.processes.created",
@@ -105,7 +106,8 @@ type metricsInfo struct {
 }
 
 type metricInfo struct {
-	Name string
+	Name       string
+	Attributes []string
 }
 
 type metricSystemProcessesCount struct {
@@ -208,7 +210,7 @@ type metricSystemProcessesCreated struct {
 // init fills system.processes.created metric with initial data.
 func (m *metricSystemProcessesCreated) init() {
 	m.data.SetName("system.processes.created")
-	m.data.SetDescription("Total number of created processes.")
+	m.data.SetDescription("Total number of created processes. Supported on Linux and OpenBSD.")
 	m.data.SetUnit("{processes}")
 	m.data.SetEmptySum()
 	m.data.Sum().SetIsMonotonic(true)

@@ -27,6 +27,13 @@ The default directory is `%ProgramData%\Otelcol\FileStorage` on Windows and `/va
 `timeout` is the maximum time to wait for a file lock. This value does not need to be modified in most circumstances.
 The default timeout is `1s`.
 
+`max_size` sets the maximum on-disk size of each bbolt database file in bytes.
+When a write would need the file to grow past this limit, the write is rejected with a storage-full error.
+A value of `0` means unlimited size.
+Writes that fit into already-allocated free space are still allowed, even when the file is already at the configured limit.
+When rebound compaction is enabled, `max_size` must be greater than or equal to both
+`compaction.rebound_needed_threshold_mib * 1,048,576` and `compaction.rebound_trigger_threshold_mib * 1,048,576`.
+
 `fsync` when set, will force the database to perform an fsync after each write.  This helps to ensure database integrity if there is an interruption to the database process, but at the cost of performance.  See [DB.NoSync](https://pkg.go.dev/go.etcd.io/bbolt#DB) for more information.
 
 `create_directory` when set, will create the data storage and compaction directories if they do not already exist.
@@ -55,6 +62,9 @@ A value of zero will ignore transaction sizes.
 `compaction.cleanup_on_start` (default: false) - specifies if removal of compaction temporary files is performed on start.
 It will remove all temporary files in the compaction directory (those which start with `tempdb`),
 temp files will be left if a previous run of the process is killed while compacting.
+
+If `max_size` is set, both `compaction.rebound_needed_threshold_mib` and `compaction.rebound_trigger_threshold_mib`
+must be less than or equal to that limit after converting MiB to bytes.
 
 ### Rebound (online) compaction
 
@@ -94,6 +104,7 @@ extensions:
   file_storage/all_settings:
     directory: /var/lib/otelcol/mydir
     timeout: 1s
+    max_size: 268435456
     recreate: true
     compaction:
       on_start: true
@@ -118,12 +129,12 @@ exporters:
 ## Replacing unsafe characters in component names
 
 The extension uses the type and name of the component using the extension to create a file where the component's data is stored.
-For example, if a file log receiver named `filelog/logs` uses the extension, its data is stored in a file named `receiver_filelog_logs`.
+For example, if a Journald receiver named `journald/myservice` uses the extension, its data is stored in a file named `receiver_journald_myservice`.
 
 Sometimes the component name contains characters that either have special meaning in paths - like `/` - or are problematic or even forbidden in file names (depending on the host operating system), like `?` or `|`.
 To prevent surprising or erroneous behavior, some characters in the component names are replaced before creating the file name to store data by the extension.
 
-For example, for a file log receiver named `filelog/logs/container`, the component name `logs/container` is sanitized into `logs~007Econtainer` and the data is stored in a file named `receiver_filelog_logs~007Econtainer`.
+For example, for a Journald receiver named `journal/mynamespace/myservice`, the component name `mynamespace/myservice` is sanitized into `mynamespace~002Fmyservice` and the data is stored in a file named `receiver_journald_mynamespace~002Fmyservice`.
 
 Every unsafe character is replaced with a tilde `~` and the character's [Unicode number][unicode_chars] in hex.
 The only safe characters are: uppercase and lowercase ASCII letters `A-Z` and `a-z`, digits `0-9`, dot `.`, hyphen `-`, underscore `_`.
@@ -152,7 +163,7 @@ created by the File Storage extension is to use the strings utility ([Linux](htt
 [Windows](https://learn.microsoft.com/en-us/sysinternals/downloads/strings)).
 
 For example, here are the contents of the file created by the File Storage extension when it's configured as the storage
-for the `filelog` receiver.
+for the File Log receiver.
 
 ```sh
 $ strings /tmp/otelcol/file_storage/filelogreceiver/receiver_filelog_

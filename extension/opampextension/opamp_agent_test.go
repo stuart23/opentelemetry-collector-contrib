@@ -42,9 +42,9 @@ func TestNewOpampAgent(t *testing.T) {
 	set.BuildInfo = component.BuildInfo{Version: "test version", Command: "otelcoltest"}
 	o, err := newOpampAgent(cfg.(*Config), set)
 	assert.NoError(t, err)
-	assert.Equal(t, "otelcoltest", o.agentType)
-	assert.Equal(t, "test version", o.agentVersion)
-	assert.NotEmpty(t, o.instanceID.String())
+	assert.Equal(t, "otelcoltest", o.serviceName)
+	assert.Equal(t, "test version", o.serviceVersion)
+	assert.NotEmpty(t, o.instanceUID.String())
 	assert.True(t, o.capabilities.ReportsEffectiveConfig)
 	assert.True(t, o.capabilities.ReportsHealth)
 	assert.Empty(t, o.effectiveConfig)
@@ -61,9 +61,9 @@ func TestNewOpampAgentAttributes(t *testing.T) {
 	set.Resource.Attributes().PutStr("service.instance.id", "f8999bc1-4c9b-4619-9bae-7f009d2411ec")
 	o, err := newOpampAgent(cfg.(*Config), set)
 	assert.NoError(t, err)
-	assert.Equal(t, "otelcol-distro", o.agentType)
-	assert.Equal(t, "distro.0", o.agentVersion)
-	assert.Equal(t, "f8999bc1-4c9b-4619-9bae-7f009d2411ec", o.instanceID.String())
+	assert.Equal(t, "otelcol-distro", o.serviceName)
+	assert.Equal(t, "distro.0", o.serviceVersion)
+	assert.Equal(t, "f8999bc1-4c9b-4619-9bae-7f009d2411ec", o.serviceInstanceID)
 	assert.NoError(t, o.Shutdown(t.Context()))
 }
 
@@ -197,14 +197,14 @@ func TestUpdateAgentIdentity(t *testing.T) {
 	o, err := newOpampAgent(cfg.(*Config), set)
 	assert.NoError(t, err)
 
-	olduid := o.instanceID
+	olduid := o.instanceUID
 	assert.NotEmpty(t, olduid.String())
 
 	uid := uuid.Must(uuid.NewV7())
 	assert.NotEqual(t, uid, olduid)
 
 	o.updateAgentIdentity(uid)
-	assert.Equal(t, o.instanceID, uid)
+	assert.Equal(t, o.instanceUID, uid)
 	assert.NoError(t, o.Shutdown(t.Context()))
 }
 
@@ -446,14 +446,47 @@ func TestHealthReportingReceiveUpdateFromAggregator(t *testing.T) {
 		{
 			Healthy:            false,
 			Status:             "StatusPermanentError",
-			StatusTimeUnixNano: uint64(now.UnixNano()),
-			LastError:          "unexpected error",
+			StatusTimeUnixNano: uint64(now.Add(1 * time.Second).UnixNano()),
+			LastError:          "error A",
 			ComponentHealthMap: map[string]*protobufs.ComponentHealth{
 				"test-receiver": {
 					Healthy:            false,
 					Status:             "StatusPermanentError",
-					StatusTimeUnixNano: uint64(now.UnixNano()),
-					LastError:          "unexpected error",
+					StatusTimeUnixNano: uint64(now.Add(1 * time.Second).UnixNano()),
+					LastError:          "error A",
+				},
+			},
+		},
+		{
+			Healthy:            false,
+			Status:             "StatusPermanentError",
+			StatusTimeUnixNano: uint64(now.Add(2 * time.Second).UnixNano()),
+			LastError:          "error B",
+			ComponentHealthMap: map[string]*protobufs.ComponentHealth{
+				"test-receiver": {
+					Healthy:            false,
+					Status:             "StatusPermanentError",
+					StatusTimeUnixNano: uint64(now.Add(2 * time.Second).UnixNano()),
+					LastError:          "error B",
+				},
+			},
+		},
+		{
+			Healthy:            false,
+			Status:             "StatusPermanentError",
+			StatusTimeUnixNano: uint64(now.Add(4 * time.Second).UnixNano()),
+			LastError:          "exporter error",
+			ComponentHealthMap: map[string]*protobufs.ComponentHealth{
+				"test-receiver": {
+					Healthy:            true,
+					Status:             "StatusOK",
+					StatusTimeUnixNano: uint64(now.Add(4 * time.Second).UnixNano()),
+				},
+				"test-exporter": {
+					Healthy:            false,
+					Status:             "StatusPermanentError",
+					StatusTimeUnixNano: uint64(now.Add(4 * time.Second).UnixNano()),
+					LastError:          "exporter error",
 				},
 			},
 		},
@@ -500,15 +533,77 @@ func TestHealthReportingReceiveUpdateFromAggregator(t *testing.T) {
 	statusUpdateChannel <- &status.AggregateStatus{
 		Event: &mockStatusEvent{
 			status:    componentstatus.StatusPermanentError,
-			err:       errors.New("unexpected error"),
-			timestamp: now,
+			err:       errors.New("error A"),
+			timestamp: now.Add(1 * time.Second),
 		},
 		ComponentStatusMap: map[string]*status.AggregateStatus{
 			"test-receiver": {
 				Event: &mockStatusEvent{
 					status:    componentstatus.StatusPermanentError,
-					err:       errors.New("unexpected error"),
-					timestamp: now,
+					err:       errors.New("error A"),
+					timestamp: now.Add(1 * time.Second),
+				},
+			},
+		},
+	}
+	statusUpdateChannel <- &status.AggregateStatus{
+		Event: &mockStatusEvent{
+			status:    componentstatus.StatusPermanentError,
+			err:       errors.New("error B"),
+			timestamp: now.Add(2 * time.Second),
+		},
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-receiver": {
+				Event: &mockStatusEvent{
+					status:    componentstatus.StatusPermanentError,
+					err:       errors.New("error B"),
+					timestamp: now.Add(2 * time.Second),
+				},
+			},
+		},
+	}
+	statusUpdateChannel <- &status.AggregateStatus{
+		Event: &mockStatusEvent{
+			status:    componentstatus.StatusPermanentError,
+			err:       errors.New("error B"),
+			timestamp: now.Add(3 * time.Second),
+		},
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-receiver": {
+				Event: &mockStatusEvent{
+					status:    componentstatus.StatusPermanentError,
+					err:       errors.New("error B"),
+					timestamp: now.Add(3 * time.Second),
+				},
+			},
+			"test-exporter": {
+				Event: &mockStatusEvent{
+					status:    componentstatus.StatusPermanentError,
+					err:       errors.New("exporter error"),
+					timestamp: now.Add(3 * time.Second),
+				},
+			},
+		},
+	}
+	statusUpdateChannel <- &status.AggregateStatus{
+		Event: &mockStatusEvent{
+			status:    componentstatus.StatusPermanentError,
+			err:       errors.New("exporter error"),
+			timestamp: now.Add(4 * time.Second),
+		},
+		ComponentStatusMap: map[string]*status.AggregateStatus{
+			"test-receiver": {
+				Event: &mockStatusEvent{
+					status:    componentstatus.StatusOK,
+					err:       nil,
+					timestamp: now.Add(4 * time.Second),
+				},
+			},
+			"test-exporter": {
+				Event: &mockStatusEvent{
+					status:    componentstatus.StatusPermanentError,
+					err:       errors.New("exporter error"),
+					timestamp: now.Add(4 * time.Second),
 				},
 			},
 		},
@@ -543,7 +638,8 @@ func TestHealthReportingForwardComponentHealthToAggregator(t *testing.T) {
 			setHealthFunc: func(_ *protobufs.ComponentHealth) error {
 				return nil
 			},
-		}, sa)
+		}, sa,
+	)
 
 	o.initHealthReporting()
 
@@ -995,9 +1091,9 @@ func newTestOpampAgent(cfg *Config, set extension.Settings, mockOpampClient *moc
 	o := &opampAgent{
 		cfg:                      cfg,
 		logger:                   set.Logger,
-		agentType:                set.BuildInfo.Command,
-		agentVersion:             set.BuildInfo.Version,
-		instanceID:               uid,
+		serviceName:              set.BuildInfo.Command,
+		serviceVersion:           set.BuildInfo.Version,
+		instanceUID:              uid,
 		capabilities:             cfg.Capabilities,
 		opampClient:              mockOpampClient,
 		statusSubscriptionWg:     &sync.WaitGroup{},

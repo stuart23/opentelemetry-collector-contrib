@@ -40,6 +40,7 @@ type Factory struct {
 	BufPool                 sync.Pool
 	InitialBufferSize       int
 	MaxLogSize              int
+	TruncateOnMaxLogSize    bool
 	Encoding                encoding.Encoding
 	SplitFunc               bufio.SplitFunc
 	TrimFunc                trim.Func
@@ -51,6 +52,7 @@ type Factory struct {
 	IncludeFileRecordOffset bool
 	Compression             string
 	AcquireFSLock           bool
+	FileCacheAdvise         bool
 }
 
 func (f *Factory) NewFingerprint(file *os.File) (*fingerprint.Fingerprint, error) {
@@ -94,6 +96,7 @@ func (f *Factory) NewReaderFromMetadata(file *os.File, m *Metadata) (r *Reader, 
 		deleteAtEOF:       f.DeleteAtEOF,
 		compression:       f.Compression,
 		acquireFSLock:     f.AcquireFSLock,
+		fileCacheAdvise:   f.FileCacheAdvise,
 		maxBatchSize:      DefaultMaxBatchSize,
 		emitFunc:          f.EmitFunc,
 	}
@@ -153,7 +156,13 @@ func (f *Factory) NewReaderFromMetadata(file *os.File, m *Metadata) (r *Reader, 
 
 	tokenLenFunc := m.TokenLenState.Func(f.SplitFunc)
 	flushFunc := m.FlushState.Func(tokenLenFunc, f.FlushTimeout)
-	r.contentSplitFunc = trim.WithFunc(trim.ToLength(flushFunc, f.MaxLogSize), f.TrimFunc)
+	var lengthLimitedFunc bufio.SplitFunc
+	if f.TruncateOnMaxLogSize {
+		lengthLimitedFunc = trim.ToLengthWithTruncate(flushFunc, f.MaxLogSize, &m.TruncateSkipping)
+	} else {
+		lengthLimitedFunc = trim.ToLength(flushFunc, f.MaxLogSize)
+	}
+	r.contentSplitFunc = trim.WithFunc(lengthLimitedFunc, f.TrimFunc)
 
 	if f.HeaderConfig != nil && !m.HeaderFinalized {
 		r.headerSplitFunc = f.HeaderConfig.SplitFunc

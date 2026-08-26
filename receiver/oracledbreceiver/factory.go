@@ -33,7 +33,8 @@ func NewFactory() receiver.Factory {
 		}, newDbClient), metadata.MetricsStability),
 		receiver.WithLogs(createLogsReceiverFunc(func(dataSourceName string) (*sql.DB, error) {
 			return sql.Open("oracle", dataSourceName)
-		}, newDbClient), metadata.LogsStability))
+		}, newDbClient), metadata.LogsStability),
+	)
 }
 
 func createDefaultConfig() component.Config {
@@ -42,9 +43,12 @@ func createDefaultConfig() component.Config {
 
 	return &Config{
 		ControllerConfig:     cfg,
-		MetricsBuilderConfig: metadata.DefaultMetricsBuilderConfig(),
+		MetricsBuilderConfig: metadata.NewDefaultMetricsBuilderConfig(),
 		LogsBuilderConfig:    metadata.DefaultLogsBuilderConfig(),
 		QuerySample: QuerySample{
+			MaxRowsPerQuery: 100,
+		},
+		SessionWaitEvent: SessionWaitEvent{
 			MaxRowsPerQuery: 100,
 		},
 		TopQueryCollection: TopQueryCollection{
@@ -115,7 +119,7 @@ func createLogsReceiverFunc(sqlOpenerFunc sqlOpenerFunc, clientProviderFunc clie
 		}
 
 		// cacheSize is kept at 2 times MaxQuerySampleCount to keep queries of adjacent collections available for delta calculation.
-		cacheSize := sqlCfg.MaxQuerySampleCount * 2
+		cacheSize := sqlCfg.TopQueryCollection.MaxQuerySampleCount * 2
 		metricCache, err := lru.New[string, map[string]int64](int(cacheSize))
 		if err != nil {
 			settings.Logger.Error("Failed to create LRU cache, skipping the current scraper", zap.Error(err))
@@ -124,7 +128,7 @@ func createLogsReceiverFunc(sqlOpenerFunc sqlOpenerFunc, clientProviderFunc clie
 
 		mp, err := newLogsScraper(logsBuilder, sqlCfg.LogsBuilderConfig, sqlCfg.ControllerConfig, settings.Logger, func() (*sql.DB, error) {
 			return sqlOpenerFunc(getDataSource(*sqlCfg))
-		}, clientProviderFunc, instanceName, metricCache, sqlCfg.TopQueryCollection, sqlCfg.QuerySample, hostName)
+		}, clientProviderFunc, instanceName, metricCache, sqlCfg.TopQueryCollection, sqlCfg.QuerySample, sqlCfg.SessionWaitEvent, hostName)
 		if err != nil {
 			return nil, err
 		}
